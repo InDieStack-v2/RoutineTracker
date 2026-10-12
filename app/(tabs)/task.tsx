@@ -29,6 +29,7 @@ import {
 
 import { Icon } from "@/components/ui/icon";
 import { Fab } from "@/components/ui/fab";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import i18n from "@/i18n";
 import { toLocalDateString } from "@/utils/dateUtils";
 
@@ -124,6 +125,8 @@ type RoutineTaskProps = {
 };
 
 const ACTION_WIDTH = 84;
+const FAB_SIZE = 56;
+const FAB_GAP = 16;
 
 function closeSwipeable(ref: React.ForwardedRef<Swipeable>) {
   if (ref && typeof ref !== "function") {
@@ -477,6 +480,8 @@ export default function TaskScreen() {
   const sectionListRef = useRef<SectionList<Task>>(null);
   const [filteredOnDate, setFilteredOnDate] = useState<Date | null>(new Date());
   const router = useRouter();
+  const tabOverflow = useBottomTabOverflow();
+  const fabBottom = tabOverflow + FAB_GAP;
 
   const routineTasks = useCandyContext((state) => state.routineTasks);
   const updateRoutineTask = useCandyContext((state) => state.updateRoutineTask);
@@ -654,7 +659,7 @@ export default function TaskScreen() {
               </Text>
             </View>
           )}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: fabBottom + FAB_SIZE + FAB_GAP }}
           showsVerticalScrollIndicator={false}
           onScrollBeginDrag={() => {
             openSwipeableRef.current?.close();
@@ -667,8 +672,9 @@ export default function TaskScreen() {
 
         <Fab
           size="lg"
-          className="bg-[#8882E7] mb-6 mr-4 shadow-lg shadow-indigo-200"
+          className="bg-[#8882E7]"
           placement="bottom right"
+          style={{ bottom: fabBottom, right: FAB_GAP }}
           onPress={() => {
             router.push("/tasks/form");
           }}
