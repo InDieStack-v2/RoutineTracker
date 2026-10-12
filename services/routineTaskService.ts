@@ -95,6 +95,22 @@ function isLiveOnDate(task: RoutineTask, onDate: Date | null): boolean {
   return true;
 }
 
+export function scheduledCompletionRate(
+  tasks: RoutineTask[],
+  onDate: Date,
+  finishedIds: readonly string[],
+): number {
+  const finished = new Set(finishedIds);
+  let available = 0;
+  let done = 0;
+  for (const task of tasks) {
+    if (!isLiveOnDate(task, onDate) || !isTaskScheduledOn(task, onDate)) continue;
+    available += 1;
+    if (finished.has(task.id)) done += 1;
+  }
+  return available === 0 ? 0 : done / available;
+}
+
 export class RoutineTaskService {
   public static async getFilteredRoutineTasks(
     routineTasks: RoutineTask[],
@@ -285,54 +301,6 @@ export class RoutineTaskService {
     }
   }
 
-  public static async getFinishedRoutineTaskRatesForDates(
-    onDates: Date[],
-  ): Promise<number[]> {
-    log.info(
-      "[RoutineTaskService] Getting finished routine task rates for dates",
-      {
-        count: onDates.length,
-      },
-    );
-
-    if (onDates.length === 0) {
-      return [];
-    }
-
-    const db = await getDB();
-    const localDateStrings = onDates.map((d) => toLocalDateString(d));
-    const utcRanges = localDateStrings.map((localDateStr) =>
-      localDateToUTCRange(localDateStr),
-    );
-
-    try {
-      const results: number[] = [];
-
-      for (const { start, end } of utcRanges) {
-        const result = await db.getFirstAsync<{
-          completion_rate: number | null;
-        }>(
-          `SELECT
-            COUNT(tc.id) * 1.0 / COUNT(rt.id) AS completion_rate
-          FROM routine_tasks rt
-          LEFT JOIN task_completions tc
-            ON tc.task_id = rt.id AND tc.completed_at_utc >= ? AND tc.completed_at_utc < ?
-          WHERE rt.deleted_at IS NULL`,
-          [start, end],
-        );
-        results.push(result?.completion_rate ?? 0);
-      }
-
-      return results;
-    } catch (error) {
-      log.error(
-        "[RoutineTaskService] Error getting batch finished routine task rates",
-        { error },
-      );
-      // Return zero rates for all requested dates in case of error
-      return onDates.map(() => 0);
-    }
-  }
 
   public static async finishRoutineTask(taskId: string): Promise<void> {
     log.info(`[RoutineTaskService] Finishing routine task: ${taskId}`);

@@ -22,7 +22,7 @@ jest.mock('@/store/settingsStore', () => ({
 }));
 jest.mock('../logger');
 
-import { RoutineTaskService, isTaskScheduledOn } from '../routineTaskService';
+import { RoutineTaskService, isTaskScheduledOn, scheduledCompletionRate } from '../routineTaskService';
 import { getDB } from '@/services/db';
 import { useSettingsStore } from '@/store/settingsStore';
 import { localDateToUTCRange } from '@/utils/dateUtils';
@@ -307,6 +307,21 @@ describe('schedule filtering', () => {
     expect(isTaskScheduledOn(task, new Date(2025, 2, 31))).toBe(true);
     expect(isTaskScheduledOn(task, new Date(2025, 1, 28))).toBe(true);
     expect(isTaskScheduledOn(task, new Date(2025, 1, 15))).toBe(false);
+  });
+
+  it('rates a day by scheduled tasks only', () => {
+    const tasks = [
+      makeTask({ id: 'due', repeat: 'daily', repeatValues: ['Wed'] }),
+      makeTask({ id: 'also', repeat: 'daily', repeatValues: ['Wed'] }),
+      makeTask({ id: 'off', repeat: 'weekly', repeatValues: ['Mon'] }),
+      makeTask({ id: 'later', createdAt: thursday, repeat: 'daily' }),
+    ];
+
+    expect(scheduledCompletionRate(tasks, wednesday, ['due'])).toBe(0.5);
+    expect(scheduledCompletionRate(tasks, wednesday, ['due', 'also', 'off'])).toBe(1);
+    expect(scheduledCompletionRate(tasks, thursday, ['off'])).toBe(0);
+    expect(scheduledCompletionRate(tasks, monday, ['off'])).toBe(1);
+    expect(scheduledCompletionRate([], wednesday, [])).toBe(0);
   });
 
   it('returns scheduled and hidden tasks when includeHidden is set', async () => {

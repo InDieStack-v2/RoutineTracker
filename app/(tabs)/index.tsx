@@ -5,6 +5,7 @@ import i18n from "@/i18n";
 import log from "@/services/logger";
 import {
   RoutineTaskService,
+  scheduledCompletionRate,
   type RoutineTaskSummary,
 } from "@/services/routineTaskService";
 import { useCandyContext } from "@/store/context";
@@ -60,8 +61,6 @@ const cardShadow = (
 ) as ViewStyle;
 
 type DayMark = {
-  done: boolean;
-  rate: number;
   taskIds: string[];
 };
 
@@ -108,11 +107,6 @@ function weekRangeLabel(start: Date, language: string): string {
   return `${startText} – ${endText}`;
 }
 
-function completionPercent(mark: DayMark | undefined): number {
-  if (!mark) return 0;
-  if (mark.rate > 0) return Math.round(Math.min(1, mark.rate) * 100);
-  return mark.done ? 100 : 0;
-}
 
 function moodValue(moodIndex: number): number {
   return 5 - Math.max(0, Math.min(4, moodIndex));
@@ -680,19 +674,13 @@ function MonthlyCalendar() {
     const id = ++requestId.current;
     try {
       const dates = datesInMonth(nextYear, nextMonth);
-      const [finished, rates] = await Promise.all([
-        RoutineTaskService.getFinishedRoutineTasksForDates(dates),
-        RoutineTaskService.getFinishedRoutineTaskRatesForDates(dates),
-      ]);
+      const finished = await RoutineTaskService.getFinishedRoutineTasksForDates(dates);
       if (id !== requestId.current) return;
       const next: Record<string, DayMark> = {};
       dates.forEach((date, index) => {
-        const key = toLocalDateString(date);
         const taskIds = finished[index] ?? [];
-        const done = taskIds.length > 0;
-        const rate = rates[index] ?? 0;
-        if (done || rate > 0) {
-          next[key] = { done, rate, taskIds };
+        if (taskIds.length > 0) {
+          next[toLocalDateString(date)] = { taskIds };
         }
       });
       setMarks(next);
@@ -806,7 +794,15 @@ function MonthlyCalendar() {
             const isToday = dateStr === today;
             const isFuture = dateStr > today;
             const selected = anchor?.date === dateStr;
-            const percent = isFuture ? 0 : completionPercent(marks[dateStr]);
+            const percent = isFuture
+              ? 0
+              : Math.round(
+                  scheduledCompletionRate(
+                    routineTasks,
+                    date,
+                    marks[dateStr]?.taskIds ?? [],
+                  ) * 100,
+                );
             const dayTasks = completedTasksFor(
               marks[dateStr]?.taskIds ?? [],
               routineTasks,
