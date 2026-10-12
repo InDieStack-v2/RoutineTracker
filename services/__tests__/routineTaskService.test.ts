@@ -25,6 +25,7 @@ jest.mock('../logger');
 import { RoutineTaskService } from '../routineTaskService';
 import { getDB } from '@/services/db';
 import { useSettingsStore } from '@/store/settingsStore';
+import { localDateToUTCRange } from '@/utils/dateUtils';
 import type { RoutineTask } from '@/store/candyStore';
 
 const mockGetDB = getDB as jest.MockedFunction<typeof getDB>;
@@ -307,6 +308,21 @@ describe('markFinishedRoutineTask', () => {
       'SELECT id FROM task_completions WHERE task_id = ? AND completed_at_utc >= ? AND completed_at_utc < ?',
       ['task-1', '2025-01-15T05:00:00.000Z', '2025-01-16T05:00:00.000Z'],
     );
+  });
+
+  it('stores the completion inside the filtered local day when that day is not today', async () => {
+    mockDb.getFirstAsync.mockResolvedValue(null);
+    mockDb.runAsync.mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
+
+    await RoutineTaskService.markFinishedRoutineTask(
+      new Date(2025, 0, 14, 15, 0, 0),
+      'task-1',
+    );
+
+    const inserted = mockDb.runAsync.mock.calls[0][1][1] as string;
+    const range = localDateToUTCRange('2025-01-14');
+    expect(inserted >= range.start && inserted < range.end).toBe(true);
+    expect(inserted).not.toBe('2025-01-15T12:00:00.000Z');
   });
 
   it('does NOT throw when DB throws error (error is caught)', async () => {

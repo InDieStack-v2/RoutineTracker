@@ -43,6 +43,8 @@ export default {
   yesterday: "Yesterday",
   other: "Other",
   skip: "Skip",
+  mark_done: "Done",
+  mark_undo: "Undo",
   routine_tasks: "Routine Tasks",
 
   // Task Form

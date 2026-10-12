@@ -39,9 +39,64 @@ export function daysBetween(a: string, b: string): number {
  * Return the YYYY-MM-DD local date string for the day before dateStr.
  */
 export function getYesterday(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d - 1);
-  return toLocalDateString(date);
+  return shiftDate(dateStr, -1);
+}
+
+function shiftDate(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return toLocalDateString(new Date(year, month - 1, day + days));
+}
+
+function streakStartDate(lastTaskDate: string, streakCount: number): string {
+  return shiftDate(lastTaskDate, -(Math.max(streakCount, 1) - 1));
+}
+
+function applyStreak(
+  snapshot: StreakSnapshot,
+  streakCount: number,
+  lastTaskDate: string,
+  freezeCount: number,
+): StreakSnapshot {
+  let nextFreeze = freezeCount;
+  let awardedAt = snapshot.lastFreezeAwardedAtStreak;
+  if (
+    streakCount > 0 &&
+    streakCount % FREEZE_AWARD_INTERVAL === 0 &&
+    streakCount > awardedAt
+  ) {
+    nextFreeze = Math.min(FREEZE_CAP, nextFreeze + 1);
+    awardedAt = streakCount;
+  }
+  const lastCheckedDate =
+    snapshot.lastCheckedDate && snapshot.lastCheckedDate > lastTaskDate
+      ? snapshot.lastCheckedDate
+      : lastTaskDate;
+  return {
+    streakCount,
+    longestStreak: Math.max(snapshot.longestStreak, streakCount),
+    freezeCount: nextFreeze,
+    lastTaskDate,
+    lastCheckedDate,
+    lastFreezeAwardedAtStreak: awardedAt,
+  };
+}
+
+// A day before the current run only extends it when it touches the start,
+// or when freezes cover the gap. A disconnected older day must not reset it.
+function recordEarlierDate(snapshot: StreakSnapshot, date: string): StreakSnapshot {
+  const { lastTaskDate, streakCount, freezeCount } = snapshot;
+  if (!lastTaskDate || streakCount <= 0) return snapshot;
+  const start = streakStartDate(lastTaskDate, streakCount);
+  if (date >= start) return snapshot;
+
+  const missedBefore = daysBetween(date, start) - 1;
+  if (missedBefore === 0) {
+    return applyStreak(snapshot, streakCount + 1, lastTaskDate, freezeCount);
+  }
+  if (missedBefore > 0 && freezeCount >= missedBefore) {
+    return applyStreak(snapshot, streakCount + 1, lastTaskDate, freezeCount - missedBefore);
+  }
+  return snapshot;
 }
 
 /**
@@ -96,32 +151,39 @@ export function computeEvaluateResult(
 }
 
 /**
- * Revoke today's streak record when the user un-completes their last task for today.
- * Only has an effect if lastTaskDate === today (meaning today was already counted).
- * Keeps longestStreak and freezeCount intact — freeze earned stays earned.
- * Returns same snapshot reference if no change.
+ * Drop `today` from the current run. The tip rolls back one day. A hole inside
+ * the run keeps only the days after it. Freezes already earned stay earned.
+ * Returns the same snapshot reference if that date was not in the run.
  */
 export function computeRevokeToday(
   snapshot: StreakSnapshot,
   today: string,
 ): StreakSnapshot {
-  // Only revoke if today was actually counted
-  if (snapshot.lastTaskDate !== today) return snapshot;
+  const { lastTaskDate, streakCount } = snapshot;
+  if (!lastTaskDate || streakCount <= 0) return snapshot;
+  const start = streakStartDate(lastTaskDate, streakCount);
+  if (today < start || today > lastTaskDate) return snapshot;
 
-  const newStreak = Math.max(0, snapshot.streakCount - 1);
+  if (today === lastTaskDate) {
+    const newStreak = Math.max(0, streakCount - 1);
+    return {
+      ...snapshot,
+      streakCount: newStreak,
+      lastTaskDate: newStreak > 0 ? getYesterday(today) : null,
+    };
+  }
+
   return {
     ...snapshot,
-    streakCount: newStreak,
-    // Roll lastTaskDate back: to yesterday if streak > 0, else null
-    lastTaskDate: newStreak > 0 ? getYesterday(today) : null,
+    streakCount: daysBetween(today, lastTaskDate),
   };
 }
 
 /**
- * Record that the user completed at least one task today.
- * Call only when the selected date IS today.
- * Idempotent — no-op if lastTaskDate is already today.
- * Returns same snapshot reference if no change.
+ * Record that `today` has at least one finished task. The argument is the
+ * filtered local date, not necessarily the real today. A later disconnected
+ * day still starts a new run. An earlier day only extends the current run
+ * when it connects. Idempotent if that date is already in the run.
  */
 export function computeRecordTaskResult(
   snapshot: StreakSnapshot,
@@ -129,22 +191,18 @@ export function computeRecordTaskResult(
 ): StreakSnapshot {
   const { lastTaskDate, streakCount, longestStreak, freezeCount, lastFreezeAwardedAtStreak } = snapshot;
 
-  // Idempotent: already recorded today
   if (lastTaskDate === today) return snapshot;
 
   let newStreak: number;
   let newFreezeCount = freezeCount;
 
   if (!lastTaskDate) {
-    // First task ever (or after a reset)
     newStreak = 1;
   } else {
     const daysSince = daysBetween(lastTaskDate, today);
     if (daysSince === 1) {
-      // Perfect continuation
       newStreak = streakCount + 1;
     } else if (daysSince > 1) {
-      // Gap (defensive: evaluateNewDay should have handled this, but protect against races)
       const missedDays = daysSince - 1;
       if (newFreezeCount >= missedDays) {
         newFreezeCount = Math.max(0, newFreezeCount - missedDays);
@@ -154,8 +212,7 @@ export function computeRecordTaskResult(
         newStreak = 1;
       }
     } else {
-      // daysSince <= 0: same day or time-travel — idempotent
-      return snapshot;
+      return recordEarlierDate(snapshot, today);
     }
   }
 
@@ -175,7 +232,11 @@ export function computeRecordTaskResult(
     longestStreak: Math.max(longestStreak, newStreak),
     freezeCount: newFreezeCount,
     lastTaskDate: today,
-    lastCheckedDate: today,
+    lastCheckedDate:
+      snapshot.lastCheckedDate && snapshot.lastCheckedDate > today
+        ? snapshot.lastCheckedDate
+        : today,
     lastFreezeAwardedAtStreak: newLastFreezeAwardedAtStreak,
   };
+
 }

@@ -43,6 +43,8 @@ export default {
   yesterday: "Hôm qua",
   other: "Khác",
   skip: "Bỏ qua",
+  mark_done: "Xong",
+  mark_undo: "Hoàn tác",
   routine_tasks: "Công việc thường ngày",
 
   // Task Form

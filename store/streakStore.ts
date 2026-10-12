@@ -17,8 +17,8 @@ export interface StreakState extends StreakSnapshot {
   isLoaded: boolean;
   loadStreak: () => Promise<void>;
   evaluateNewDay: () => Promise<void>;
-  recordTaskDone: () => Promise<void>;
-  revokeToday: () => Promise<void>;
+  recordTaskDone: (date?: string) => Promise<void>;
+  revokeToday: (date?: string) => Promise<void>;
 }
 
 async function persistSnapshot(snapshot: StreakSnapshot): Promise<void> {
@@ -65,29 +65,33 @@ export const useStreakStore = create<StreakState>()((set, get) => ({
     }
   },
 
-   recordTaskDone: async () => {
+   recordTaskDone: async (date?: string) => {
      try {
        const today = todayLocalDateString();
+       const target = date ?? today;
+       if (target > today) return;
        const current = get();
-       const newSnapshot = computeRecordTaskResult(current, today);
+       const newSnapshot = computeRecordTaskResult(current, target);
        if (newSnapshot === current) return;
        await persistSnapshot(newSnapshot);
        set(newSnapshot);
-       log.info('[StreakStore] streak updated', { streakCount: newSnapshot.streakCount, freezeCount: newSnapshot.freezeCount });
+       log.info('[StreakStore] streak updated', { streakCount: newSnapshot.streakCount, freezeCount: newSnapshot.freezeCount, date: target });
      } catch (error) {
        log.error('[StreakStore] recordTaskDone failed', { error });
      }
    },
 
-    revokeToday: async () => {
+    revokeToday: async (date?: string) => {
      try {
        const today = todayLocalDateString();
+       const target = date ?? today;
+       if (target > today) return;
        const current = get();
-       const newSnapshot = computeRevokeToday(current, today);
+       const newSnapshot = computeRevokeToday(current, target);
        if (newSnapshot === current) return;
        await persistSnapshot(newSnapshot);
        set(newSnapshot);
-       log.info('[StreakStore] streak revoked for today', { streakCount: newSnapshot.streakCount });
+       log.info('[StreakStore] streak revoked', { streakCount: newSnapshot.streakCount, date: target });
      } catch (error) {
        log.error('[StreakStore] revokeToday failed', { error });
      }

@@ -343,3 +343,68 @@ describe('computeRecordTaskResult', () => {
     expect(result.lastFreezeAwardedAtStreak).toBe(0); // no award at streak 1
   });
 });
+
+describe('computeRecordTaskResult on a specific date', () => {
+  it('continues the run when the filtered day is the day after lastTaskDate', () => {
+    const snapshot: StreakSnapshot = {
+      ...DEFAULT_SNAPSHOT,
+      streakCount: 3,
+      lastTaskDate: '2025-01-12',
+      lastCheckedDate: '2025-01-15',
+    };
+    const result = computeRecordTaskResult(snapshot, '2025-01-13');
+    expect(result.streakCount).toBe(4);
+    expect(result.lastTaskDate).toBe('2025-01-13');
+    expect(result.lastCheckedDate).toBe('2025-01-15');
+  });
+
+  it('extends backward when the filtered day touches the start of the run', () => {
+    const snapshot: StreakSnapshot = {
+      ...DEFAULT_SNAPSHOT,
+      streakCount: 3,
+      longestStreak: 3,
+      lastTaskDate: '2025-01-14',
+    };
+    const result = computeRecordTaskResult(snapshot, '2025-01-11');
+    expect(result.streakCount).toBe(4);
+    expect(result.lastTaskDate).toBe('2025-01-14');
+  });
+
+  it('does not reset the current run for a disconnected older day', () => {
+    const snapshot: StreakSnapshot = {
+      ...DEFAULT_SNAPSHOT,
+      streakCount: 5,
+      lastTaskDate: '2025-01-15',
+    };
+    const result = computeRecordTaskResult(snapshot, '2025-01-01');
+    expect(result).toBe(snapshot);
+  });
+});
+
+describe('computeRevokeToday on a specific date', () => {
+  it('keeps only the days after a hole inside the run', () => {
+    const snapshot: StreakSnapshot = {
+      ...DEFAULT_SNAPSHOT,
+      streakCount: 5,
+      longestStreak: 9,
+      freezeCount: 1,
+      lastTaskDate: '2025-01-15',
+    };
+    const result = computeRevokeToday(snapshot, '2025-01-12');
+    expect(result.streakCount).toBe(3);
+    expect(result.lastTaskDate).toBe('2025-01-15');
+    expect(result.longestStreak).toBe(9);
+    expect(result.freezeCount).toBe(1);
+  });
+
+  it('shortens from the start when the first day of the run is cleared', () => {
+    const snapshot: StreakSnapshot = {
+      ...DEFAULT_SNAPSHOT,
+      streakCount: 4,
+      lastTaskDate: '2025-01-14',
+    };
+    const result = computeRevokeToday(snapshot, '2025-01-11');
+    expect(result.streakCount).toBe(3);
+    expect(result.lastTaskDate).toBe('2025-01-14');
+  });
+});

@@ -53,7 +53,7 @@ export class RoutineTaskService {
     const db = await getDB();
     const localDateStr = toLocalDateString(onDate);
     const { start, end } = localDateToUTCRange(localDateStr);
-    const completedAtUtc = new Date().toISOString();
+    const completedAtUtc = completionInstantForLocalDate(onDate);
 
     try {
       // Check if already exists for this date using UTC range
@@ -272,4 +272,15 @@ export class RoutineTaskService {
       return null;
     }
   }
+}
+
+// Today keeps the real clock time. Any other filter day is stored at local noon
+// so day counts and reloads attribute the completion to that day, not to now.
+function completionInstantForLocalDate(onDate: Date): string {
+  const localDateStr = toLocalDateString(onDate);
+  if (localDateStr === toLocalDateString(new Date())) {
+    return new Date().toISOString();
+  }
+  const [year, month, day] = localDateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0).toISOString();
 }

@@ -12,20 +12,19 @@ import {
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
   FlatList,
   Platform,
   SectionList,
   Text,
   TouchableOpacity,
   View,
+  type ViewStyle,
 } from "react-native";
 import {
   GestureHandlerRootView,
   Swipeable,
 } from "react-native-gesture-handler";
-import log from "@/services/logger";
+
 import { Icon } from "@/components/ui/icon";
 import { Fab } from "@/components/ui/fab";
 import i18n from "@/i18n";
@@ -50,14 +49,18 @@ interface ItemViewProps {
 const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
   return (
     <View
-      className="bg-white rounded-2xl mb-3 mx-4 p-4 border border-gray-100 flex-row items-center"
-      style={{
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
+      className="bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center"
+      style={
+        Platform.OS === "web"
+          ? ({ boxShadow: "0 1px 3px rgba(17, 24, 39, 0.06)" } as ViewStyle)
+          : {
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              elevation: 2,
+            }
+      }
     >
       <TouchableOpacity
         className="flex-1 flex-row items-center"
@@ -118,13 +121,58 @@ type RoutineTaskProps = {
   onItemPress?: (taskId: string) => void;
 };
 
+const ACTION_WIDTH = 84;
+
+function closeSwipeable(ref: React.ForwardedRef<Swipeable>) {
+  if (ref && typeof ref !== "function") {
+    ref.current?.close();
+  }
+}
+
+function SwipeAction({
+  label,
+  icon,
+  color,
+  side,
+}: {
+  label: string;
+  icon: typeof CheckIcon;
+  color: string;
+  side: "left" | "right";
+}) {
+  return (
+    <View
+      style={{
+        width: ACTION_WIDTH,
+        height: "100%",
+        paddingRight: side === "left" ? 8 : 0,
+        paddingLeft: side === "right" ? 8 : 0,
+      }}
+    >
+      <View
+        style={{
+          flex: 1,
+          borderRadius: 16,
+          backgroundColor: color,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon as={icon} className="text-white" size="md" />
+        <Text className="text-white text-xs font-semibold mt-1" numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const RoutineTask = React.memo(
   React.forwardRef<Swipeable, RoutineTaskProps>(
     (
       {
         task,
         onToggle,
-        onToggleFavorite,
         onDelete,
         onSwipeableWillOpen,
         onClose,
@@ -132,105 +180,50 @@ const RoutineTask = React.memo(
       },
       ref,
     ) => {
-      const SCREEN_WIDTH = Dimensions.get("window").width;
-
-      const renderRightActions = (
-        progress: Animated.AnimatedInterpolation<number>,
-        dragX: Animated.AnimatedInterpolation<number>,
-      ) => {
-        const trans = dragX.interpolate({
-          inputRange: [-SCREEN_WIDTH * 0.2, 0],
-          outputRange: [0, SCREEN_WIDTH * 0.8],
-          extrapolate: "clamp",
-        });
-        return (
-          <View
-            className="bg-red-500 rounded-2xl mb-3 mx-4"
-            style={{ width: SCREEN_WIDTH }}
-          >
-            <Animated.View
-              style={{
-                flex: 1,
-                justifyContent: "center",
-                alignItems: "flex-end",
-                transform: [{ translateX: trans }],
-              }}
-            >
-              <View className="flex-row items-center gap-2 p-4 pr-8">
-                <Text className="text-white font-bold">{i18n.t('skip')}</Text>
-                <Icon as={ArrowRightIcon} className="text-white" size="xl" />
-              </View>
-            </Animated.View>
-          </View>
-        );
-      };
-
-      const renderLeftActions = (
-        progress: Animated.AnimatedInterpolation<number>,
-        dragX: Animated.AnimatedInterpolation<number>,
-      ) => {
-        const trans = dragX.interpolate({
-          inputRange: [-SCREEN_WIDTH * 0.2, 0],
-          outputRange: [0, 0],
-          extrapolate: "clamp",
-        });
-        return (
-          <View
-            className={`${
-              task.isDone ? "bg-red-500" : "bg-green-500"
-            } rounded-2xl mb-3 mx-4`}
-            style={{ width: SCREEN_WIDTH }}
-          >
-            <Animated.View
-              className="flex-1 items-start justify-center"
-              style={{
-                transform: [{ translateX: trans }],
-              }}
-            >
-              <View className="items-center gap-2 px-8">
-                <Icon
-                  as={task.isDone ? XIcon : CheckIcon}
-                  className="text-white"
-                  size="xl"
-                />
-              </View>
-            </Animated.View>
-          </View>
-        );
-      };
-
       return (
-        <Swipeable
-          ref={ref}
-          overshootRight={false}
-          rightThreshold={SCREEN_WIDTH * 0.1}
-          renderRightActions={task.isDone ? undefined : renderRightActions}
-          renderLeftActions={renderLeftActions}
-          onSwipeableWillOpen={onSwipeableWillOpen}
-          onSwipeableRightWillOpen={() => {
-            setTimeout(() => {
-              if (ref && typeof ref !== "function" && ref.current) {
-                ref.current.close();
+        <View className="mx-4 mb-3">
+          <Swipeable
+            ref={ref}
+            overshootLeft={false}
+            overshootRight={false}
+            friction={2}
+            useNativeAnimations={Platform.OS !== "web"}
+            renderLeftActions={() => (
+              <SwipeAction
+                side="left"
+                color={task.isDone ? "#ef4444" : "#8882e7"}
+                icon={task.isDone ? XIcon : CheckIcon}
+                label={i18n.t(task.isDone ? "mark_undo" : "mark_done")}
+              />
+            )}
+            renderRightActions={
+              task.isDone
+                ? undefined
+                : () => (
+                    <SwipeAction
+                      side="right"
+                      color="#6b7280"
+                      icon={ArrowRightIcon}
+                      label={i18n.t("skip")}
+                    />
+                  )
+            }
+            onSwipeableWillOpen={onSwipeableWillOpen}
+            onSwipeableOpen={(direction) => {
+              closeSwipeable(ref);
+              if (direction === "left") {
+                onToggle(task.id);
+              } else {
+                onDelete?.(task.id);
               }
-            }, 100);
-            log.info("[RoutineTask] onSwipeableRightWillOpen");
-          }}
-          onSwipeableClose={() => {
-            log.info("[RoutineTask] onSwipeableClose");
-            onClose();
-          }}
-          onSwipeableLeftWillOpen={() => {
-            setTimeout(() => {
-              onToggle(task.id);
-              if (ref && typeof ref !== "function" && ref.current) {
-                ref.current.close();
-              }
-            }, 100);
-            log.info("[RoutineTask] onSwipeableLeftWillOpen");
-          }}
-        >
-          <ItemView task={task} onItemPress={onItemPress} />
-        </Swipeable>
+            }}
+            onSwipeableClose={() => {
+              onClose();
+            }}
+          >
+            <ItemView task={task} onItemPress={onItemPress} />
+          </Swipeable>
+        </View>
       );
     },
   ),
@@ -428,20 +421,15 @@ export default function TaskScreen() {
         );
       }
 
-      // Streak: update based on remaining completed count for today
-      const todayStr = toLocalDateString(new Date());
       const selectedStr = toLocalDateString(filteredOnDate || new Date());
-      if (selectedStr === todayStr) {
-        // Count tasks that will be done after this toggle
-        const remainingDoneCount = task.isDone
-          ? tasks.filter((t) => t.isDone && t.id !== taskId).length  // un-completing: exclude this task
-          : tasks.filter((t) => t.isDone).length + 1;                // completing: add this task
+      const remainingDoneCount = task.isDone
+        ? tasks.filter((t) => t.isDone && t.id !== taskId).length
+        : tasks.filter((t) => t.isDone).length + 1;
 
-        if (remainingDoneCount > 0) {
-          await useStreakStore.getState().recordTaskDone();
-        } else {
-          await useStreakStore.getState().revokeToday();
-        }
+      if (remainingDoneCount > 0) {
+        await useStreakStore.getState().recordTaskDone(selectedStr);
+      } else {
+        await useStreakStore.getState().revokeToday(selectedStr);
       }
 
       setTasks((prevTasks) =>
