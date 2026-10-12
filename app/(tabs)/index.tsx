@@ -580,16 +580,39 @@ function MoodLine({
             {points.map((point, index) =>
               point == null ? null : (
                 <SvgCircle
-                  key={labels[index] ?? index}
+                  key={`halo-${labels[index] ?? index}`}
                   cx={xFor(index, chartWidth)}
                   cy={yFor(point)}
-                  r={index === todayIndex ? 5 : 4}
-                  fill={ACCENT}
+                  r={11}
+                  fill="#ffffff"
+                  stroke={ACCENT}
+                  strokeWidth={1.5}
                 />
               ),
             )}
           </Svg>
         ) : null}
+        {chartWidth > 0
+          ? points.map((point, index) =>
+              point == null ? null : (
+                <Text
+                  key={`emoji-${labels[index] ?? index}`}
+                  style={{
+                    position: "absolute",
+                    left: EMOJI_COL + xFor(index, chartWidth) - 10,
+                    top: yFor(point) - 9,
+                    width: 20,
+                    textAlign: "center",
+                    fontSize: 13,
+                    lineHeight: 18,
+                  }}
+                >
+                  {Emojis[5 - point]}
+                </Text>
+              ),
+            )
+          : null}
+
       </View>
       {chartWidth > 0 ? (
         <View style={{ height: 18, marginLeft: EMOJI_COL, marginTop: 6 }}>
@@ -637,7 +660,18 @@ function MoodChart() {
   const todayIndex = dates.indexOf(today);
   const logged = points.filter((point) => point != null);
   const latest = [...points].reverse().find((point) => point != null);
-  const latestEmoji = latest == null ? null : Emojis[5 - latest];
+  const latestIndex = latest == null ? null : 5 - latest;
+  const latestEmoji = latestIndex == null ? null : Emojis[latestIndex];
+  const latestLabel =
+    latestIndex == null
+      ? null
+      : [
+          i18n.t("great"),
+          i18n.t("good"),
+          i18n.t("okay"),
+          i18n.t("not_good"),
+          i18n.t("bad"),
+        ][latestIndex];
   const shiftWeek = (delta: number) => {
     setWeekOffset((current) => Math.min(0, current + delta));
   };
@@ -647,7 +681,10 @@ function MoodChart() {
       title={i18n.t("mood_chart")}
       trailing={
         latestEmoji ? (
-          <Text style={{ fontSize: 28, lineHeight: 32 }}>{latestEmoji}</Text>
+          <View className="items-end">
+            <Text style={{ fontSize: 28, lineHeight: 32 }}>{latestEmoji}</Text>
+            <Text className="text-xs font-semibold text-gray-500">{latestLabel}</Text>
+          </View>
         ) : null
       }
     >
@@ -683,8 +720,6 @@ function MoodChart() {
 export default function HomeScreen() {
   const scrollViewRef = React.useRef<ScrollView>(null);
 
-
-
   useScrollToTop(scrollViewRef);
 
   return (
@@ -702,7 +737,7 @@ export default function HomeScreen() {
             width: "100%",
             alignItems: "center",
             paddingTop: 16,
-            paddingBottom: 96,
+            paddingBottom: Platform.OS === "ios" ? 96 : 16,
             ...(Platform.OS === "web" ? { overflowAnchor: "none" } : null),
           } as ViewStyle
         }

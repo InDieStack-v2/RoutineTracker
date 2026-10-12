@@ -19,6 +19,7 @@ export default {
   not_good: "Không tốt",
   bad: "Tệ",
   moods: "Tâm trạng",
+  moods_logged: "%{count} ngày đã ghi",
 
   // Home (Stats)
   calendar_stats: "Thống kê lịch",

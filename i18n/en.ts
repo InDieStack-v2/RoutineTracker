@@ -19,6 +19,7 @@ export default {
   not_good: "Not Good",
   bad: "Bad",
   moods: "Moods",
+  moods_logged: "%{count} logged",
   
   // Home (Stats)
   calendar_stats: "Calendar Stats",

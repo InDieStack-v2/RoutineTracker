@@ -1,278 +1,325 @@
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
-import { Box } from "@/components/ui/box";
-import { Text } from "@/components/ui/text";
-import { VStack } from "@/components/ui/vstack";
-import { HStack } from "@/components/ui/hstack";
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type ViewStyle,
+} from "react-native";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react-native";
 import { Icon } from "@/components/ui/icon";
-import { Pressable } from "@/components/ui/pressable";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  PlusIcon,
-} from "lucide-react-native";
 import { Emojis } from "@/constants/Moods";
-import { useMoodStore } from "@/store/moodStore";
-import {
-  Actionsheet,
-  ActionsheetBackdrop,
-  ActionsheetContent,
-  ActionsheetDragIndicator,
-  ActionsheetDragIndicatorWrapper,
-} from "@/components/ui/actionsheet";
-import { Button, ButtonText } from "@/components/ui/button";
 import i18n from "@/i18n";
-import { todayLocalDateString } from "@/utils/dateUtils";
+import { useMoodStore } from "@/store/moodStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { toLocalDateString, todayLocalDateString } from "@/utils/dateUtils";
 
-export default function MoodScreen() {
-  const DAYS_OF_WEEK = [
-    i18n.t('mon'), i18n.t('tue'), i18n.t('wed'), i18n.t('thu'), i18n.t('fri'), i18n.t('sat'), i18n.t('sun')
+const MOOD_COLORS = ["#D1FAE5", "#E0F2FE", "#F3F4F6", "#FEF3C7", "#FEE2E2"];
+const ACCENT = "#8882e7";
+
+const cardShadow = (
+  Platform.OS === "web"
+    ? { boxShadow: "0 1px 3px rgba(17, 24, 39, 0.06)" }
+    : {
+        shadowColor: "#111827",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+      }
+) as ViewStyle;
+
+function moodLabels(): string[] {
+  return [
+    i18n.t("great"),
+    i18n.t("good"),
+    i18n.t("okay"),
+    i18n.t("not_good"),
+    i18n.t("bad"),
   ];
-  const MOOD_LABELS = [
-    i18n.t('great'), i18n.t('good'), i18n.t('okay'), i18n.t('not_good'), i18n.t('bad')
+}
+
+function weekLabels(): string[] {
+  return [
+    i18n.t("mon"),
+    i18n.t("tue"),
+    i18n.t("wed"),
+    i18n.t("thu"),
+    i18n.t("fri"),
+    i18n.t("sat"),
+    i18n.t("sun"),
   ];
-  const MOOD_COLORS = ["#D1FAE5", "#E0F2FE", "#F3F4F6", "#FEF3C7", "#FEE2E2"]; // Soft backgrounds for moods
+}
 
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [showActionsheet, setShowActionsheet] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedMoodIndex, setSelectedMoodIndex] = useState<number | null>(null);
+function appLocale(): string {
+  return i18n.locale === "vi" ? "vi-VN" : "en-US";
+}
 
-  const { getMoodLog, addMoodLog } = useMoodStore();
+function formatLongDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(appLocale(), {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+}
 
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    // 0 = Sunday, 1 = Monday, ...
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const handlePrevMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1),
-    );
-  };
-
-  const handleNextMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
-    );
-  };
-
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleString("default", { month: "long", year: "numeric" });
-  };
-
-  const handleDayPress = (day: number) => {
-    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    
-    const log = getMoodLog(dateStr);
-    setSelectedDate(dateStr);
-    setSelectedMoodIndex(log ? log.moodIndex : null);
-    setShowActionsheet(true);
-  };
-
-  const handleSaveMood = () => {
-    if (selectedMoodIndex !== null && selectedDate) {
-      addMoodLog({
-        date: selectedDate,
-        moodIndex: selectedMoodIndex,
-      });
-      setShowActionsheet(false);
-    }
-  };
-
-  const renderCalendar = () => {
-    const daysInMonth = getDaysInMonth(currentDate);
-    const firstDay = getFirstDayOfMonth(currentDate);
-    const startOffset = (firstDay + 6) % 7;
-
-    const cells = [];
-
-    // Empty cells
-    for (let i = 0; i < startOffset; i++) {
-      cells.push(
-        <Box key={`empty-${i}`} className="w-[14.28%] aspect-square" />,
-      );
-    }
-
-    // Days
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      const log = getMoodLog(dateStr);
-      const isToday = dateStr === todayLocalDateString();
-
-      cells.push(
-        <Pressable
-          key={`day-${day}`}
-          onPress={() => isToday ? handleDayPress(day): {}}
-          className="w-[14.28%] aspect-square items-center justify-center mb-2"
-        >
-          <VStack className="items-center justify-center w-full h-full">
-            <View
-              style={[
-                { width: 40, height: 40, borderRadius: 9999, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-                { backgroundColor: log ? MOOD_COLORS[log.moodIndex] : (isToday ? "#8882E7" : "#F9FAFB") },
-                isToday && !log ? styles.shadowSm : {}
-              ]}
-            >
-              {log ? (
-                <Text className="text-2xl">
-                  {Emojis[log.moodIndex]}
-                </Text>
-              ) : isToday ? (
-                <Icon as={PlusIcon} size="md" className="text-white" />
-              ) : (
-                <Text className="text-sm font-medium text-gray-400">{day}</Text>
-              )}
-            </View>
-            
-            {(log || isToday) && (
-              <Text 
-                size="xs" 
-                className={`text-[10px] font-medium ${isToday ? "text-[#8882E7] font-bold" : "text-gray-400"}`}
-              >
-                {day}
-              </Text>
-            )}
-          </VStack>
-        </Pressable>,
-      );
-    }
-
-    return cells;
-  };
+function MoodPicker({
+  date,
+  selectedIndex,
+  onSelect,
+  onClose,
+  onSave,
+}: {
+  date: string;
+  selectedIndex: number | null;
+  onSelect: (index: number) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const labels = moodLabels();
 
   return (
-    <ScrollView className="flex-1 bg-white" showsVerticalScrollIndicator={false}>
-      <Box className="p-6 bg-white min-h-full pb-20">
-        <HStack className="items-center justify-between mb-8 mt-4">
-          <Pressable 
-            onPress={handlePrevMonth} 
-            className="w-10 h-10 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
-          >
-            <Icon as={ChevronLeftIcon} size="lg" className="text-gray-600" />
-          </Pressable>
-          <Text size="2xl" className="font-bold text-gray-900 tracking-tight">
-            {formatMonthYear(currentDate)}
-          </Text>
-          <Pressable 
-            onPress={handleNextMonth} 
-            className="w-10 h-10 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
-          >
-            <Icon as={ChevronRightIcon} size="lg" className="text-gray-600" />
-          </Pressable>
-        </HStack>
-
-        <HStack className="mb-4 border-b border-gray-100 pb-2">
-          {DAYS_OF_WEEK.map((day) => (
-            <Box key={day} className="w-[14.28%] items-center">
-              <Text size="xs" className="font-bold text-gray-400 uppercase tracking-wider">
-                {day}
-              </Text>
-            </Box>
-          ))}
-        </HStack>
-
-        <Box className="flex-row flex-wrap">{renderCalendar()}</Box>
-
-        <Actionsheet
-          isOpen={showActionsheet}
-          onClose={() => setShowActionsheet(false)}
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <Pressable
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(17, 24, 39, 0.35)",
+          padding: 24,
+        }}
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={() => {}}
+          className="w-full bg-white rounded-3xl p-5 border border-gray-100"
+          style={
+            Platform.OS === "web"
+              ? ({
+                  maxWidth: 360,
+                  boxShadow: "0 12px 40px rgba(17, 24, 39, 0.16)",
+                } as ViewStyle)
+              : {
+                  maxWidth: 360,
+                  shadowColor: "#111827",
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.16,
+                  shadowRadius: 24,
+                  elevation: 8,
+                }
+          }
         >
-          <ActionsheetBackdrop />
-          <ActionsheetContent className="pb-8 rounded-t-[32px]">
-            <ActionsheetDragIndicatorWrapper>
-              <ActionsheetDragIndicator />
-            </ActionsheetDragIndicatorWrapper>
-            
-            <Text size="xl" className="font-bold mb-8 mt-4 text-center text-gray-900">
-              {i18n.t('how_are_you_feeling')}
+          <Text className="text-lg font-semibold text-gray-900 text-center">
+            {i18n.t("how_are_you_feeling")}
+          </Text>
+          <Text className="text-sm text-gray-400 text-center mt-1 mb-4">
+            {formatLongDate(date)}
+          </Text>
+          {labels.map((label, index) => {
+            const selected = selectedIndex === index;
+            return (
+              <Pressable
+                key={label}
+                accessibilityRole="button"
+                onPress={() => onSelect(index)}
+                className="flex-row items-center rounded-2xl px-3 py-2.5 mb-2"
+                style={{ backgroundColor: selected ? "#f3f1ff" : "#f9fafb" }}
+              >
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-full mr-3"
+                  style={{ backgroundColor: selected ? ACCENT : MOOD_COLORS[index] }}
+                >
+                  <Text style={{ fontSize: 22 }}>{Emojis[index]}</Text>
+                </View>
+                <Text
+                  className="flex-1 text-base font-semibold"
+                  style={{ color: selected ? ACCENT : "#374151" }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            accessibilityRole="button"
+            disabled={selectedIndex === null}
+            onPress={onSave}
+            className="mt-2 h-12 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: selectedIndex === null ? "#e5e7eb" : ACCENT }}
+          >
+            <Text className="text-white font-semibold">
+              {selectedIndex === null ? i18n.t("select_mood") : i18n.t("save_mood")}
             </Text>
-
-            <HStack className="justify-between w-full px-4 mb-10">
-              {MOOD_LABELS.map((label, index) => (
-                <Pressable
-                  key={index}
-                  onPress={() => setSelectedMoodIndex(index)}
-                  className="items-center gap-2"
-                >
-                  <View
-                    style={[
-                      { width: 45, height: 45, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
-                      selectedMoodIndex === index 
-                        ? { backgroundColor: "#8882E7", transform: [{ scale: 1.1 }] } 
-                        : { backgroundColor: MOOD_COLORS[index] || "#F9FAFB" },
-                      selectedMoodIndex === index ? styles.shadowLg : {}
-                    ]}
-                  >
-                    <Text className="text-3xl">{Emojis[index]}</Text>
-                  </View>
-                  <Text
-                    size="xs"
-                    className={`font-medium ${
-                      selectedMoodIndex === index
-                        ? "text-[#8882E7] font-bold"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              )).reverse()}
-            </HStack>
-
-            <View style={[{ width: '100%', borderRadius: 16 }]}>
-                <Button
-                className="w-full rounded-2xl h-14 bg-[#8882E7] active:opacity-90"
-                onPress={handleSaveMood}
-                isDisabled={selectedMoodIndex === null}
-                >
-                <ButtonText className="text-white font-bold text-lg">
-                    {selectedMoodIndex !== null
-                    ? i18n.t('save_mood')
-                    : i18n.t('select_mood')}
-                </ButtonText>
-                </Button>
-            </View>
-          </ActionsheetContent>
-        </Actionsheet>
-      </Box>
-    </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  shadowSm: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.18,
-    shadowRadius: 1.00,
-    elevation: 1,
-  },
-  shadowMd: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  shadowLg: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    shadowOpacity: 0.34,
-    shadowRadius: 6.27,
-    elevation: 10,
-  },
-});
+
+export default function MoodScreen() {
+  const language = useSettingsStore((state) => state.language);
+  const moodLogs = useMoodStore((state) => state.moodLogs);
+  const addMoodLog = useMoodStore((state) => state.addMoodLog);
+  const [currentDate, setCurrentDate] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  );
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedMoodIndex, setSelectedMoodIndex] = useState<number | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const today = todayLocalDateString();
+  const labels = weekLabels();
+  const locale = language === "vi" ? "vi-VN" : "en-US";
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+  const monthLogs = moodLogs.filter((log) => log.date.startsWith(monthPrefix));
+  const topMood = (() => {
+    if (monthLogs.length === 0) return null;
+    const counts = [0, 0, 0, 0, 0];
+    for (const log of monthLogs) counts[log.moodIndex] += 1;
+    const index = counts.indexOf(Math.max(...counts));
+    return { emoji: Emojis[index], label: moodLabels()[index] };
+  })();
+
+  const openDay = (day: number) => {
+    const date = new Date(year, month, day);
+    const dateStr = toLocalDateString(date);
+    if (dateStr > today) return;
+    const log = moodLogs.find((entry) => entry.date === dateStr);
+    setSelectedDate(dateStr);
+    setSelectedMoodIndex(log ? log.moodIndex : null);
+    setPickerOpen(true);
+  };
+
+  const saveMood = () => {
+    if (selectedMoodIndex === null || !selectedDate) return;
+    addMoodLog({ date: selectedDate, moodIndex: selectedMoodIndex });
+    setPickerOpen(false);
+  };
+
+  return (
+    <View className="flex-1 bg-gray-50">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          width: "100%",
+          maxWidth: 576,
+          alignSelf: "center",
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 96,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="bg-white rounded-3xl p-5 border border-gray-100" style={cardShadow}>
+          <View className="flex-row items-center justify-between mb-5">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t("previous_month")}
+              onPress={() => setCurrentDate(new Date(year, month - 1, 1))}
+              className="h-9 w-9 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+            >
+              <Icon as={ChevronLeftIcon} size="sm" className="text-gray-600" />
+            </Pressable>
+            <Text className="text-lg font-semibold text-gray-900">
+              {currentDate.toLocaleDateString(locale, { month: "long", year: "numeric" })}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t("next_month")}
+              onPress={() => setCurrentDate(new Date(year, month + 1, 1))}
+              className="h-9 w-9 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+            >
+              <Icon as={ChevronRightIcon} size="sm" className="text-gray-600" />
+            </Pressable>
+          </View>
+
+          <View className="flex-row mb-2">
+            {labels.map((label) => (
+              <Text
+                key={label}
+                numberOfLines={1}
+                className="text-xs font-semibold text-gray-400 text-center"
+                style={{ width: "14.28%" }}
+              >
+                {label}
+              </Text>
+            ))}
+          </View>
+
+          <View className="flex-row flex-wrap">
+            {Array.from({ length: startOffset }, (_, index) => (
+              <View key={`empty-${index}`} style={{ width: "14.28%", height: 44 }} />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, index) => {
+              const day = index + 1;
+              const dateStr = toLocalDateString(new Date(year, month, day));
+              const log = moodLogs.find((entry) => entry.date === dateStr);
+              const isToday = dateStr === today;
+              const isFuture = dateStr > today;
+              return (
+                <Pressable
+                  key={dateStr}
+                  accessibilityRole="button"
+                  disabled={isFuture}
+                  onPress={() => openDay(day)}
+                  className="items-center justify-center"
+                  style={{ width: "14.28%", height: 44, opacity: isFuture ? 0.4 : 1 }}
+                >
+                  <View
+                    className="h-10 w-10 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: log ? MOOD_COLORS[log.moodIndex] : "transparent",
+                      borderWidth: log && !isToday ? 0 : 1,
+                      borderColor: isToday ? ACCENT : "#e5e7eb",
+                    }}
+                  >
+                    {log ? (
+                      <Text style={{ fontSize: 18 }}>{Emojis[log.moodIndex]}</Text>
+                    ) : (
+                      <Text
+                        className="text-sm font-semibold"
+                        style={{ color: isToday ? ACCENT : "#6b7280" }}
+                      >
+                        {day}
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View className="flex-row items-center justify-between mt-4 px-1">
+          <Text className="text-sm text-gray-500">
+            {i18n.t("moods_logged", { count: monthLogs.length })}
+          </Text>
+          {topMood ? (
+            <Text className="text-sm font-semibold text-gray-700">
+              {topMood.emoji} {topMood.label}
+            </Text>
+          ) : null}
+        </View>
+      </ScrollView>
+
+      {pickerOpen ? (
+        <MoodPicker
+          date={selectedDate}
+          selectedIndex={selectedMoodIndex}
+          onSelect={setSelectedMoodIndex}
+          onClose={() => setPickerOpen(false)}
+          onSave={saveMood}
+        />
+      ) : null}
+    </View>
+  );
+}
