@@ -6,7 +6,10 @@ import { RoutineTaskService } from './routineTaskService';
 import log from './logger';
 
 export const setupNotificationHandler = async () => {
-  // 1. Set notification handler
+  if (Platform.OS === "web") {
+    return;
+  }
+
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -65,6 +68,10 @@ export const setupNotificationHandler = async () => {
 };
 
 export const scheduleNotificationsForRoutineTasks = async () => {
+  if (Platform.OS === "web") {
+    return;
+  }
+
   const routineTasks = await RoutineTaskService.getFilteredRoutineTasks(
     candyStore.getState().routineTasks
   );

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Platform, StyleSheet } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { DateTimeField } from "@/components/DateTimeField";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text } from "@/components/ui/text";
@@ -126,7 +127,18 @@ export default function SettingScreen() {
               {i18n.t("daily_reminder")}
             </Text>
 
-            {Platform.OS === "android" ? (
+            {Platform.OS === "web" ? (
+              <DateTimeField
+                mode="time"
+                value={timeDate}
+                onChange={(date) => {
+                  setReminderTime(date);
+                  setTimeout(() => {
+                    void scheduleNotificationsForRoutineTasks();
+                  }, 100);
+                }}
+              />
+            ) : Platform.OS === "android" ? (
               <Pressable
                 onPress={() => setShowTimePicker(true)}
                 className="bg-gray-100 px-3 py-1.5 rounded-md"

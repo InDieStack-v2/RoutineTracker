@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import log from './logger';
 
 export type SQLiteDatabase = SQLite.SQLiteDatabase;
@@ -174,8 +175,16 @@ export async function getDB(): Promise<SQLiteDatabase> {
   
     const db = await SQLite.openDatabaseAsync('routine_tracker.db');
   
-    // Enable WAL mode and foreign keys
-    await db.execAsync('PRAGMA journal_mode = WAL');
+    // WAL is the native journal mode. wa-sqlite on web may reject it.
+    if (Platform.OS === 'web') {
+      try {
+        await db.execAsync('PRAGMA journal_mode = WAL');
+      } catch (error) {
+        log.warn('[DB] WAL mode unavailable on web', { error });
+      }
+    } else {
+      await db.execAsync('PRAGMA journal_mode = WAL');
+    }
     await db.execAsync('PRAGMA foreign_keys = ON');
   
     // Run migrations

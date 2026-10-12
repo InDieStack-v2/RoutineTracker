@@ -10,4 +10,21 @@ config.transformer.minifierConfig = {
   },
 };
 
-module.exports = withNativeWind(config, { input: './global.css'});
+// expo-sqlite web loads wa-sqlite.wasm. Metro must treat it as an asset.
+config.resolver.assetExts.push('wasm');
+config.resolver.sourceExts = config.resolver.sourceExts.filter((ext) => ext !== 'wasm');
+
+const nativeWindConfig = withNativeWind(config, { input: './global.css' });
+
+// SharedArrayBuffer, required by wa-sqlite, is only available on an isolated page.
+const previousEnhance = nativeWindConfig.server?.enhanceMiddleware;
+nativeWindConfig.server.enhanceMiddleware = (middleware, ...args) => {
+  const enhanced = previousEnhance ? previousEnhance(middleware, ...args) : middleware;
+  return (req, res, next) => {
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    return enhanced(req, res, next);
+  };
+};
+
+module.exports = nativeWindConfig;

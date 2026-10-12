@@ -2,6 +2,7 @@ import { RoutineTaskService } from "@/services/routineTaskService";
 import { useCandyContext } from "@/store/context";
 import { useStreakStore } from "@/store/streakStore";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { DateTimeField } from "@/components/DateTimeField";
 import { useFocusEffect, useRouter, useScrollToTop } from "expo-router";
 import {
   ArrowRightIcon,
@@ -14,6 +15,7 @@ import {
   Animated,
   Dimensions,
   FlatList,
+  Platform,
   SectionList,
   Text,
   TouchableOpacity,
@@ -292,7 +294,19 @@ const FilterTask: React.FC<FilterTaskProps> = React.memo(
 
     return (
       <View className="flex-row items-center mb-6 px-4 pt-2">
-        {showDatePicker && (
+        {showDatePicker && Platform.OS === "web" && (
+          <DateTimeField
+            mode="date"
+            value={selectedDate || new Date()}
+            onChange={(date) => {
+              setShowDatePicker(false);
+              onSelectedDateChange(date);
+              setSelectedType("custom");
+              setCustomDateLabel(toLocalDateString(date));
+            }}
+          />
+        )}
+        {showDatePicker && Platform.OS !== "web" && (
           <DateTimePicker
             testID="dateTimePicker"
             value={selectedDate || new Date()}
