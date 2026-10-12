@@ -1,561 +1,718 @@
-import ProgressCircle from "@/components/CircleProgress";
-import { Heading } from "@/components/ui/heading";
+import { ProgressCircle } from "@/components/CircleProgress";
 import { Icon } from "@/components/ui/icon";
+import { Emojis } from "@/constants/Moods";
+import i18n from "@/i18n";
 import log from "@/services/logger";
 import { RoutineTaskService } from "@/services/routineTaskService";
-import { toLocalDateString } from "@/utils/dateUtils";
-import { useFocusEffect, useScrollToTop } from "expo-router";
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "lucide-react-native";
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { ScrollView, Text, View, useWindowDimensions } from "react-native";
-import { Calendar } from "react-native-calendars";
-import { BarChart, LineChart } from "react-native-gifted-charts";
 import { useMoodStore } from "@/store/moodStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import {
+  addLocalDays,
+  datesInMonth,
+  startOfWeekMonday,
+  todayLocalDateString,
+  toLocalDateString,
+} from "@/utils/dateUtils";
+import { useFocusEffect, useScrollToTop } from "expo-router";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react-native";
+import React, { useCallback, useRef, useState } from "react";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type ViewStyle,
+} from "react-native";
+import Svg, {
+  Circle as SvgCircle,
+  Line as SvgLine,
+  Path as SvgPath,
+} from "react-native-svg";
 
-import i18n from "@/i18n";
+const ACCENT = "#8882e7";
+const ACCENT_SOFT = "#d9d7f8";
+const TRACK = "#f3f4f6";
+const BAR_TRACK = 88;
+const CHART_HEIGHT = 128;
+const CHART_PAD_TOP = 12;
+const CHART_PAD_BOTTOM = 12;
+const EMOJI_COL = 24;
 
-const MonthlyCalendar = React.memo(() => {
-  const [markFinishedDates, setMarkFinishedDates] = useState<string[]>([]);
-  const [markFinishedDateRates, setMarkFinishedDateRates] = useState<
-    Map<string, number>
-  >(new Map());
-
-  async function fetchFinishedDates(onDate: Date | null = null) {
-    let markDate = new Date();
-    if (onDate) {
-      markDate = onDate;
-    }
-
-    const datesToFetch: Date[] = [];
-    for (let i = 1; i <= 31; i++) {
-      const date = new Date(markDate);
-      date.setDate(i);
-      datesToFetch.push(date);
-    }
-
-    const results =
-      await RoutineTaskService.getFinishedRoutineTasksForDates(datesToFetch);
-
-    const finishedDates = results
-       .map((res, index) => {
-         if (res.length > 0) {
-           const date = new Date(markDate);
-           date.setDate(index + 1);
-           return toLocalDateString(date);
-         }
-         return null;
-       })
-      .filter((date) => date !== null);
-
-    setMarkFinishedDates(finishedDates);
-
-    const rateResults =
-      await RoutineTaskService.getFinishedRoutineTaskRatesForDates(
-        datesToFetch,
-      );
-    const finishedDateRates = new Map<string, number>();
-     rateResults.forEach((rate, index) => {
-       if (rate !== null) {
-         const date = new Date(markDate);
-         date.setDate(index + 1);
-         const dateStr = toLocalDateString(date);
-         finishedDateRates.set(dateStr, rate);
-       }
-     });
-    setMarkFinishedDateRates(finishedDateRates);
-
-    log.info(`[HomeScreen] Fetched finished dates: ${finishedDates}`);
-    log.info(
-      `[HomeScreen] Fetched finished date rates: ${Array.from(finishedDateRates.entries())}`,
-    );
-  }
-
-  const memoizedFetchFinishedDates = useCallback(() => {
-    fetchFinishedDates();
-
-    return () => {
-      setMarkFinishedDates([]);
-    };
-  }, []);
-
-  useFocusEffect(memoizedFetchFinishedDates);
-
-  const markedDates = useMemo(() => {
-    const result: { [date: string]: { marked: boolean; rate: number } } = {};
-    for (const date of markFinishedDates) {
-      result[date] = { marked: true, rate: 0 };
-      if (markFinishedDateRates.has(date)) {
-        const rate = markFinishedDateRates.get(date) ?? 0;
-        result[date].rate = rate;
+const cardShadow = (
+  Platform.OS === "web"
+    ? { boxShadow: "0 1px 3px rgba(17, 24, 39, 0.06)", overflowAnchor: "none" }
+    : {
+        shadowColor: "#111827",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
       }
-    }
-    return result;
-  }, [markFinishedDates, markFinishedDateRates]);
+) as ViewStyle;
 
-  const handleMonthChange = useCallback(
-    (month: Date) => fetchFinishedDates(month),
-    []
-  );
+type DayMark = {
+  done: boolean;
+  rate: number;
+};
 
-  return (
-    <StatsView
-      title={i18n.t('calendar_stats')}
-      data={{
-        markFinishedDates,
-        markedDates,
-        onMonthChange: handleMonthChange,
-      }}
-      type="progress_calendar"
-    />
-  );
-});
-MonthlyCalendar.displayName = 'MonthlyCalendar';
+type WeekCount = {
+  date: string;
+  value: number;
+};
 
-const WeeklyChart = React.memo(() => {
-  const [taskCounts, setTaskCounts] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
-
-  async function fetchTasks() {
-    const _now = new Date();
-    let weekDay = _now.getDay(); // 0 (Sun) to 6 (Sat)
-    if (weekDay === 0) weekDay = 7; // Make Sunday the last day
-
-    const datesToFetch: Date[] = [];
-
-    for (let i = 1; i <= weekDay; i++) {
-      const atDate = new Date(_now);
-      atDate.setDate(_now.getDate() - weekDay + i);
-
-      datesToFetch.push(atDate);
-    }
-
-    const results =
-      await RoutineTaskService.getFinishedRoutineTasksForDates(datesToFetch);
-    const counts = results.map((res) => res.length);
-
-    while (counts.length < 7) {
-      counts.push(0);
-    }
-
-    log.info(`[HomeScreen] Weekly task counts: ${counts}`);
-    setTaskCounts(counts);
-  }
-
-  const memoizedFetchTasks = useCallback(() => {
-    fetchTasks();
-
-    return () => {
-      setTaskCounts([0, 0, 0, 0, 0, 0, 0]);
-    };
-  }, []);
-
-  useFocusEffect(memoizedFetchTasks);
-
-  return <StatsView title={i18n.t('tasks_completed')} data={{ taskCounts }} type="bar" />;
-});
-WeeklyChart.displayName = 'WeeklyChart';
-
-const MoodChart = React.memo(() => {
-  const moodLogs = useMoodStore((state) => state.moodLogs);
-  const { width } = useWindowDimensions();
-
-  const lineData = useMemo(() => {
-    const _now = new Date();
-    const currentDay = _now.getDay() === 0 ? 7 : _now.getDay(); // 1-7 (Mon-Sun)
-
-    const data = [];
-    const dayLabels = [
-      i18n.t('mon'), i18n.t('tue'), i18n.t('wed'), i18n.t('thu'), i18n.t('fri'), i18n.t('sat'), i18n.t('sun')
-    ];
-
-    // Calculate start of week (Monday)
-    const startOfWeek = new Date(_now);
-    startOfWeek.setDate(_now.getDate() - currentDay + 1);
-
-    for (let i = 0; i < 7; i++) {
-      const atDate = new Date(startOfWeek);
-      atDate.setDate(startOfWeek.getDate() + i);
-      const dateStr = `${atDate.getFullYear()}-${String(
-        atDate.getMonth() + 1,
-      ).padStart(2, "0")}-${String(atDate.getDate()).padStart(2, "0")}`;
-
-      const log = moodLogs.find((l) => l.date === dateStr);
-      const dayLabel = dayLabels[i];
-
-      if (log) {
-        data.push({
-          value: 4 - log.moodIndex + 1, // Invert: Great(0)->5, Bad(4)->1
-          label: dayLabel,
-          labelTextStyle: { color: "gray" },
-          dataPointText: "",
-        });
-      } else {
-        // For future days or days with no data
-        data.push({
-          value: 1,
-          label: dayLabel,
-          labelTextStyle: { color: "gray" },
-          hideDataPoint: true,
-          customDataPoint: () => null,
-        });
-      }
-    }
-
-    return data;
-  }, [moodLogs]);
-
-  // Calculate spacing to fit 7 points exactly in the width
-  // Total width available = Screen Width - Padding (e.g. 40 or 60)
-  // We have 7 points, so 6 intervals.
-  const chartWidth = width - 60;
-  const spacing = chartWidth / 7;
-
-  return (
-    <StatsView
-      title={i18n.t('mood_chart')}
-      data={{ lineData, spacing, width: chartWidth }}
-      type="line"
-    />
-  );
-});
-MoodChart.displayName = 'MoodChart';
-
-interface StatsViewProps {
-  title: string;
-  data: {
-    taskCounts?: number[];
-    markFinishedDates?: string[];
-    markedDates?: { [date: string]: { marked: boolean; rate: number } };
-    lineData?: any[];
-    onMonthChange?: (month: Date) => void;
-    spacing?: number;
-    width?: number;
-  };
-  type?: "bar" | "line" | "progress_calendar";
+function weekLabels(): string[] {
+  return [
+    i18n.t("mon"),
+    i18n.t("tue"),
+    i18n.t("wed"),
+    i18n.t("thu"),
+    i18n.t("fri"),
+    i18n.t("sat"),
+    i18n.t("sun"),
+  ];
 }
 
-const StatsView = React.memo(({ title, data, type = "bar" }: StatsViewProps) => {
-  let chartComponent = null;
-  switch (type) {
-    case "bar":
-      chartComponent = (
-        <View className="py-4">
-          <BarChartView taskCounts={data.taskCounts ?? []} />
-        </View>
-      );
-      break;
+function monthLabel(year: number, month: number, language: string): string {
+  const locale = language === "vi" ? "vi-VN" : "en-US";
+  return new Date(year, month, 1).toLocaleDateString(locale, {
+    month: "long",
+    year: "numeric",
+  });
+}
 
-    case "line":
-      chartComponent = (
-        <View className="py-4">
-          <MoodLineChart
-            lineData={data.lineData ?? []}
-            spacing={data.spacing}
-            width={data.width}
-          />
-        </View>
-      );
-      break;
+function weekRangeLabel(start: Date, language: string): string {
+  const end = addLocalDays(start, 6);
+  const locale = language === "vi" ? "vi-VN" : "en-US";
+  const sameMonth =
+    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  const includeYear = end.getFullYear() !== new Date().getFullYear();
+  const startText = start.toLocaleDateString(locale, {
+    month: "short",
+    day: "numeric",
+  });
+  const endText = end.toLocaleDateString(locale, {
+    day: "numeric",
+    ...(sameMonth ? {} : { month: "short" }),
+    ...(includeYear ? { year: "numeric" } : {}),
+  });
+  return `${startText} – ${endText}`;
+}
 
-    case "progress_calendar":
-      chartComponent = (
-        <View className="pb-2">
-          <CalendarView
-            markedDates={data.markedDates}
-            onMonthChange={data.onMonthChange}
-          />
-        </View>
-      );
-      break;
+function completionPercent(mark: DayMark | undefined): number {
+  if (!mark) return 0;
+  if (mark.rate > 0) return Math.round(Math.min(1, mark.rate) * 100);
+  return mark.done ? 100 : 0;
+}
 
-    default:
-      break;
-  }
+function moodValue(moodIndex: number): number {
+  return 5 - Math.max(0, Math.min(4, moodIndex));
+}
 
-  let filterText = i18n.t('this_week');
-  if (type === "progress_calendar") {
-    filterText = i18n.t('this_month');
-  }
+function yFor(value: number): number {
+  const plot = CHART_HEIGHT - CHART_PAD_TOP - CHART_PAD_BOTTOM;
+  return CHART_PAD_TOP + ((5 - value) / 4) * plot;
+}
 
+function xFor(index: number, width: number): number {
+  const padX = Math.min(14, width / 10);
+  return padX + (index / 6) * Math.max(0, width - padX * 2);
+}
+
+function Board({
+  eyebrow,
+  title,
+  trailing,
+  children,
+}: {
+  eyebrow?: string;
+  title: string;
+  trailing?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <View className="mb-6 mx-4">
+    <View className="mb-4 mx-4">
       <View
-        className="bg-white rounded-3xl p-5 border border-gray-100"
-        style={{
-          elevation: 4,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 8,
-        }}
+        className="bg-white rounded-3xl px-5 py-5 border border-gray-100"
+        style={cardShadow}
       >
         <View className="flex-row items-center justify-between mb-4">
-          <Heading className="text-xl font-bold text-gray-800 tracking-tight">
-            {title}
-          </Heading>
-
-          <View className="flex-row items-center bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-            <Text className="text-xs font-semibold text-gray-600 mr-1">
-              {filterText}
-            </Text>
-            <Icon as={ChevronDownIcon} size="xs" className="text-gray-400" />
+          <View className="flex-1 mr-3" style={{ minWidth: 0 }}>
+            {eyebrow ? (
+              <Text className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
+                {eyebrow}
+              </Text>
+            ) : null}
+            <Text className="text-lg font-semibold text-gray-900">{title}</Text>
           </View>
+          {trailing}
         </View>
-
-        <View>{chartComponent}</View>
+        {children}
       </View>
     </View>
   );
-});
-StatsView.displayName = 'StatsView';
-
-const MoodLineChart = React.memo(({
-  lineData,
-  spacing = 40,
-  width = 300,
-}: {
-  lineData: any[];
-  spacing?: number;
-  width?: number;
-}) => {
-  // Emojis: ["😎", "😊", "😐", "😢", "😡"]
-  // Indices: 0, 1, 2, 3, 4
-  // Values: 4, 3, 2, 1, 0
-  // Y-Axis Labels should be mapped from value.
-  // 0 -> 😡 (index 4)
-  // 1 -> 😢 (index 3)
-  // 2 -> 😐 (index 2)
-  // 3 -> 😊 (index 1)
-  // 4 -> 😎 (index 0)
-  const yAxisLabelTexts = [" ", "😡", "😢", "😐", "😊", "😎"];
-
-  return (
-    <View
-      style={{ borderRadius: 16, overflow: "hidden" }}
-      className="py-2 items-center"
-    >
-      <LineChart
-        data={lineData}
-        areaChart
-        curved
-        isAnimated
-        animationDuration={1200}
-        startFillColor="#8985e8"
-        startOpacity={0.15}
-        endFillColor="#ffffff"
-        endOpacity={0.01}
-        color="#8985e8"
-        thickness={3}
-        dataPointsColor="#8985e8"
-        dataPointsRadius={5}
-        textFontSize={10}
-        hideRules
-        yAxisLabelTexts={yAxisLabelTexts}
-        yAxisOffset={0}
-        maxValue={5}
-        stepValue={1}
-        noOfSections={5}
-        yAxisTextStyle={{ fontSize: 16, color: "#4b5563" }}
-        width={width - 20}
-        spacing={spacing}
-        initialSpacing={20}
-        backgroundColor="transparent"
-        hideDataPoints={false}
-      />
-    </View>
-  );
-});
-MoodLineChart.displayName = 'MoodLineChart';
-
-const BarChartView = React.memo(({ taskCounts }: { taskCounts: number[] }) => {
-  const [pressedBarIndex, setPressedBarIndex] = useState(-1);
-  const labels = [
-    i18n.t('mon'), i18n.t('tue'), i18n.t('wed'), i18n.t('thu'), i18n.t('fri'), i18n.t('sat'), i18n.t('sun')
-  ];
-  const { width } = useWindowDimensions();
-  const initialSpacing = 10;
-  const barWidth =
-    ((width * 0.85 - initialSpacing) * 3) / (taskCounts.length * 4);
-
-  const barData = taskCounts.map((count, index) => {
-    return {
-      value: count,
-      frontColor: index === pressedBarIndex ? "#8985e8" : "#dadaf8",
-      gradientColor: index === pressedBarIndex ? "#6b66d8" : "#e6e6fa",
-      label: labels[index],
-      labelTextStyle: {
-        color: index === pressedBarIndex ? "#8985e8" : "#9ca3af",
-        fontSize: 12,
-        fontWeight: (index === pressedBarIndex ? "bold" : "normal") as
-          | "bold"
-          | "normal",
-      },
-      topLabelComponent: () => {
-        if (index === pressedBarIndex) {
-          return (
-            <View className="items-center mb-2">
-              <View
-                className="items-center justify-center rounded-xl bg-gray-800 px-3 py-1.5 shadow-md"
-                style={{
-                  elevation: 4,
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 4,
-                }}
-              >
-                <Text className="text-white text-xs font-bold">{count}</Text>
-              </View>
-              <View
-                className="w-3 h-3 bg-gray-800"
-                style={{
-                  transform: [{ rotate: "45deg" }],
-                  marginTop: -6,
-                  zIndex: -1,
-                }}
-              />
-            </View>
-          );
-        }
-        return null;
-      },
-    };
-  });
-
-  return (
-    <BarChart
-      data={barData}
-      barWidth={barWidth}
-      initialSpacing={10}
-      spacing={14}
-      barBorderTopLeftRadius={8}
-      barBorderTopRightRadius={8}
-      showGradient
-      yAxisThickness={0}
-      xAxisThickness={0}
-      yAxisTextStyle={{ color: "#9ca3af", fontSize: 11 }}
-      noOfSections={3}
-      maxValue={
-        Math.max(...taskCounts) + 3 < 5 ? 5 : Math.max(...taskCounts) + 3
-      }
-      isAnimated
-      animationDuration={300}
-      onPress={(item: any, index: number) => {
-        if (taskCounts[index] === 0) {
-          // Optional: allow pressing 0 to see "0 tasks"
-        }
-        setPressedBarIndex(index === pressedBarIndex ? -1 : index);
-      }}
-    />
-  );
-});
-BarChartView.displayName = 'BarChartView';
-
-interface CalendarViewProps {
-  markedDates?: { [date: string]: { marked: boolean; rate: number } };
-  onMonthChange?: (month: Date) => void;
 }
 
-const CalendarView = React.memo(({ markedDates, onMonthChange }: CalendarViewProps) => {
-  return (
-    <Calendar
-      style={{ borderRadius: 12, overflow: "hidden" }}
-      theme={{
-        backgroundColor: "#ffffff",
-        calendarBackground: "#ffffff",
-        textSectionTitleColor: "#b6c1cd",
-        selectedDayBackgroundColor: "#8985e8",
-        selectedDayTextColor: "#ffffff",
-        todayTextColor: "#8985e8",
-        dayTextColor: "#2d4150",
-        textDisabledColor: "#d9e1e8",
-        dotColor: "#8985e8",
-        selectedDotColor: "#ffffff",
-        arrowColor: "#8985e8",
-        disabledArrowColor: "#d9e1e8",
-        monthTextColor: "#1f2937",
-        indicatorColor: "#8985e8",
-        textDayFontWeight: "600",
-        textMonthFontWeight: "700",
-        textDayHeaderFontWeight: "600",
-        textDayFontSize: 14,
-        textMonthFontSize: 16,
-        textDayHeaderFontSize: 12,
-      }}
-      renderArrow={(direction) =>
-        direction === "left" ? (
-          <View className="bg-gray-50 p-1 rounded-full">
-            <Icon as={ChevronLeftIcon} size="sm" className="text-gray-600" />
-          </View>
-        ) : (
-          <View className="bg-gray-50 p-1 rounded-full">
-            <Icon as={ChevronRightIcon} size="sm" className="text-gray-600" />
-          </View>
-        )
-      }
-      markedDates={markedDates}
-      dayComponent={({ date, marking, state }) => {
-        if (!date) return null;
-        const markedData = markedDates ? markedDates[date.dateString] : null;
-        const isActuallyMarked = markedData ? markedData.marked : false;
-        const actualPercent = markedData ? markedData.rate * 100 : 0;
+function WeeklyChart() {
+  const language = useSettingsStore((state) => state.language);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [counts, setCounts] = useState<WeekCount[]>([]);
+  const [ready, setReady] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const weekOffsetRef = useRef(0);
+  const requestId = useRef(0);
 
-        // Use actual data from markedDates prop to avoid inconsistency
-        const finalIsMarked = isActuallyMarked;
-        const finalPercent = actualPercent;
+  const labels = weekLabels();
+  const today = todayLocalDateString();
+  const weekStart = addLocalDays(startOfWeekMonday(new Date()), weekOffset * 7);
+  const isCurrentWeek = weekOffset === 0;
 
-        return (
-          <View className="items-center justify-center h-8 w-8">
-            <ProgressCircle
-              progressPercent={
-                finalIsMarked ? (finalPercent === 0 ? 100 : finalPercent) : 0
-              }
-              displayText={date?.day?.toString() ?? ""}
-              textColor={
-                state === "disabled"
-                  ? "#d1d5db"
-                  : isActuallyMarked
-                    ? "#8985e8"
-                    : "#4b5563"
-              }
-            />
-          </View>
-        );
-      }}
-      onMonthChange={(month: any) => {
-        onMonthChange && onMonthChange(new Date(month.dateString));
-      }}
-    />
-  );
-});
-CalendarView.displayName = 'CalendarView';
-
-export default function HomeScreen() {
-  const scrollViewRef = useRef<ScrollView>(null);
+  const loadWeek = useCallback(async (offset: number) => {
+    const id = ++requestId.current;
+    try {
+      const start = addLocalDays(startOfWeekMonday(new Date()), offset * 7);
+      const dates = Array.from({ length: 7 }, (_, index) => addLocalDays(start, index));
+      const results = await RoutineTaskService.getFinishedRoutineTasksForDates(dates);
+      if (id !== requestId.current) return;
+      setCounts(
+        dates.map((date, index) => ({
+          date: toLocalDateString(date),
+          value: results[index]?.length ?? 0,
+        })),
+      );
+      setReady(true);
+    } catch (error) {
+      log.error("[HomeScreen] Failed to load weekly tasks", { error });
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-    }, [])
+      loadWeek(weekOffsetRef.current);
+      return () => {
+        requestId.current += 1;
+      };
+    }, [loadWeek]),
   );
+
+  const shiftWeek = (delta: number) => {
+    const next = Math.min(0, weekOffsetRef.current + delta);
+    if (next === weekOffsetRef.current) return;
+    weekOffsetRef.current = next;
+    setSelectedDate(null);
+    setWeekOffset(next);
+    loadWeek(next);
+  };
+
+  const bars = counts.map((count, index) => ({
+    ...count,
+    label: labels[index] ?? "",
+    isToday: count.date === today,
+    isFuture: count.date > today,
+  }));
+  const total = bars.reduce(
+    (sum, bar) => sum + (bar.isFuture ? 0 : bar.value),
+    0,
+  );
+  const max = Math.max(1, ...bars.map((bar) => bar.value));
+
+  return (
+    <Board
+      title={i18n.t("tasks_completed")}
+      trailing={
+        <Text className="text-2xl font-bold text-gray-900">{ready ? total : "–"}</Text>
+      }
+    >
+      <WeekSwitch
+        label={isCurrentWeek ? i18n.t("this_week") : weekRangeLabel(weekStart, language)}
+        canGoForward={weekOffset < 0}
+        onShift={shiftWeek}
+      />
+      {ready && total === 0 ? (
+        <Text className="text-sm text-gray-400 mb-3">
+          {i18n.t(isCurrentWeek ? "no_tasks_this_week" : "no_tasks_that_week")}
+        </Text>
+      ) : null}
+      <View className="flex-row items-end">
+        {(bars.length > 0 ? bars : labels.map((label) => ({
+          date: label,
+          value: 0,
+          label,
+          isToday: false,
+          isFuture: false,
+        }))).map((bar) => {
+          const selected = selectedDate === bar.date;
+          const height =
+            bar.value === 0 ? 0 : Math.max(6, (bar.value / max) * BAR_TRACK);
+          return (
+            <Pressable
+              key={`${language}-${bar.date}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${bar.label}, ${bar.value}`}
+              disabled={bar.isFuture || bar.value === 0}
+              onPress={() =>
+                setSelectedDate((current) =>
+                  current === bar.date ? null : bar.date,
+                )
+              }
+              className="flex-1 items-center"
+              style={{ minWidth: 0 }}
+            >
+              <Text
+                className="text-xs font-semibold mb-1"
+                style={{
+                  color: selected || bar.isToday ? ACCENT : "#4b5563",
+                  opacity: bar.value > 0 ? 1 : 0,
+                }}
+              >
+                {bar.value || 0}
+              </Text>
+              <View
+                className="overflow-hidden justify-end"
+                style={{
+                  width: "55%",
+                  maxWidth: 22,
+                  height: BAR_TRACK,
+                  borderRadius: 8,
+                  backgroundColor: bar.isFuture ? "#f9fafb" : TRACK,
+                }}
+              >
+                <View
+                  style={{
+                    height,
+                    backgroundColor:
+                      selected || bar.isToday ? ACCENT : ACCENT_SOFT,
+                  }}
+                />
+              </View>
+              <Text
+                numberOfLines={1}
+                className="text-xs mt-2"
+                style={{
+                  color: bar.isToday ? ACCENT : "#9ca3af",
+                  fontWeight: bar.isToday ? "700" : "500",
+                }}
+              >
+                {bar.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Board>
+  );
+}
+
+function MonthArrow({
+  direction,
+  onPress,
+  disabled = false,
+  label,
+}: {
+  direction: "left" | "right";
+  onPress: () => void;
+  disabled?: boolean;
+  label?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        label ?? i18n.t(direction === "left" ? "previous_month" : "next_month")
+      }
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+      style={{ opacity: disabled ? 0.35 : 1 }}
+    >
+      <Icon
+        as={direction === "left" ? ChevronLeftIcon : ChevronRightIcon}
+        size="sm"
+        className="text-gray-600"
+      />
+    </Pressable>
+  );
+}
+
+function WeekSwitch({
+  label,
+  canGoForward,
+  onShift,
+}: {
+  label: string;
+  canGoForward: boolean;
+  onShift: (delta: number) => void;
+}) {
+  return (
+    <View className="flex-row items-center justify-between mb-3">
+      <MonthArrow
+        direction="left"
+        label={i18n.t("previous_week")}
+        onPress={() => onShift(-1)}
+      />
+      <Text
+        numberOfLines={1}
+        className="flex-1 text-center text-sm font-semibold text-gray-700 mx-2"
+      >
+        {label}
+      </Text>
+      <MonthArrow
+        direction="right"
+        label={i18n.t("next_week")}
+        onPress={() => onShift(1)}
+        disabled={!canGoForward}
+      />
+    </View>
+  );
+}
+
+function MonthlyCalendar() {
+  const language = useSettingsStore((state) => state.language);
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [marks, setMarks] = useState<Record<string, DayMark>>({});
+  const [cellWidth, setCellWidth] = useState(0);
+  const labels = weekLabels();
+  const today = todayLocalDateString();
+  const { year, month } = visibleMonth;
+  const days = datesInMonth(year, month);
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const ringSize =
+    cellWidth > 0 ? Math.min(40, Math.max(24, Math.floor(cellWidth) - 8)) : 28;
+  const monthRef = useRef(visibleMonth);
+  const requestId = useRef(0);
+
+  const loadMonth = useCallback(async (nextYear: number, nextMonth: number) => {
+    const id = ++requestId.current;
+    try {
+      const dates = datesInMonth(nextYear, nextMonth);
+      const [finished, rates] = await Promise.all([
+        RoutineTaskService.getFinishedRoutineTasksForDates(dates),
+        RoutineTaskService.getFinishedRoutineTaskRatesForDates(dates),
+      ]);
+      if (id !== requestId.current) return;
+      const next: Record<string, DayMark> = {};
+      dates.forEach((date, index) => {
+        const key = toLocalDateString(date);
+        const done = (finished[index]?.length ?? 0) > 0;
+        const rate = rates[index] ?? 0;
+        if (done || rate > 0) {
+          next[key] = { done, rate };
+        }
+      });
+      setMarks(next);
+    } catch (error) {
+      log.error("[HomeScreen] Failed to load calendar", { error });
+    }
+  }, []);
+
+  const shiftMonth = (delta: number) => {
+    const current = monthRef.current;
+    const nextDate = new Date(current.year, current.month + delta, 1);
+    const next = { year: nextDate.getFullYear(), month: nextDate.getMonth() };
+    monthRef.current = next;
+    setVisibleMonth(next);
+    loadMonth(next.year, next.month);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const current = monthRef.current;
+      loadMonth(current.year, current.month);
+      return () => {
+        requestId.current += 1;
+      };
+    }, [loadMonth]),
+  );
+
+  return (
+    <Board
+      eyebrow={i18n.t("calendar_stats")}
+      title={monthLabel(year, month, language)}
+      trailing={
+        <View className="flex-row items-center gap-2">
+          <MonthArrow direction="left" onPress={() => shiftMonth(-1)} />
+          <MonthArrow direction="right" onPress={() => shiftMonth(1)} />
+        </View>
+      }
+    >
+      <View className="flex-row mb-2">
+        {labels.map((label) => (
+          <Text
+            key={label}
+            numberOfLines={1}
+            className="text-xs font-semibold text-gray-400 text-center"
+            style={{ width: "14.28%" }}
+          >
+            {label}
+          </Text>
+        ))}
+      </View>
+      <View
+        className="flex-row flex-wrap"
+        onLayout={(event) => {
+          const next = event.nativeEvent.layout.width / 7;
+          if (next > 0 && Math.abs(next - cellWidth) > 0.5) {
+            setCellWidth(next);
+          }
+        }}
+      >
+        {Array.from({ length: startOffset }, (_, index) => (
+          <View key={`empty-${index}`} style={{ width: "14.28%", height: ringSize + 8 }} />
+        ))}
+        {days.map((date) => {
+          const dateStr = toLocalDateString(date);
+          const isToday = dateStr === today;
+          const isFuture = dateStr > today;
+          const percent = isFuture ? 0 : completionPercent(marks[dateStr]);
+          return (
+            <View
+              key={dateStr}
+              className="items-center justify-center"
+              style={{ width: "14.28%", height: ringSize + 8 }}
+            >
+              <ProgressCircle
+                size={ringSize}
+                progressPercent={percent}
+                displayText={String(date.getDate())}
+                textColor={
+                  isFuture ? "#d1d5db" : isToday || percent > 0 ? ACCENT : "#4b5563"
+                }
+              />
+            </View>
+          );
+        })}
+      </View>
+    </Board>
+  );
+}
+
+function MoodLine({
+  points,
+  labels,
+  todayIndex,
+  width,
+}: {
+  points: (number | null)[];
+  labels: string[];
+  todayIndex: number;
+  width: number;
+}) {
+  const chartWidth = Math.max(0, width - EMOJI_COL);
+  const groups: number[][] = [];
+  let current: number[] = [];
+  points.forEach((point, index) => {
+    if (point == null) {
+      if (current.length > 0) groups.push(current);
+      current = [];
+      return;
+    }
+    current.push(index);
+  });
+  if (current.length > 0) groups.push(current);
+
+  return (
+    <View>
+      <View className="flex-row" style={{ height: CHART_HEIGHT }}>
+        <View style={{ width: EMOJI_COL, height: CHART_HEIGHT }}>
+          {Emojis.map((emoji, index) => (
+            <Text
+              key={emoji}
+              style={{
+                position: "absolute",
+                top: yFor(5 - index) - 8,
+                width: EMOJI_COL,
+                textAlign: "center",
+                fontSize: 13,
+                lineHeight: 16,
+              }}
+            >
+              {emoji}
+            </Text>
+          ))}
+        </View>
+        {chartWidth > 0 ? (
+          <Svg width={chartWidth} height={CHART_HEIGHT}>
+            {Emojis.map((emoji, index) => (
+              <SvgLine
+                key={emoji}
+                x1={0}
+                x2={chartWidth}
+                y1={yFor(5 - index)}
+                y2={yFor(5 - index)}
+                stroke="#f3f4f6"
+                strokeWidth={1}
+              />
+            ))}
+            {groups.map((group) => {
+              const line = group
+                .map((index, order) => {
+                  const value = points[index] ?? 1;
+                  return `${order === 0 ? "M" : "L"}${xFor(index, chartWidth)},${yFor(value)}`;
+                })
+                .join(" ");
+              const first = group[0];
+              const last = group[group.length - 1];
+              const bottom = CHART_HEIGHT - CHART_PAD_BOTTOM;
+              const area = `${line} L${xFor(last, chartWidth)},${bottom} L${xFor(first, chartWidth)},${bottom} Z`;
+              return (
+                <React.Fragment key={group.join("-")}>
+                  {group.length > 1 ? (
+                    <SvgPath d={area} fill={ACCENT} fillOpacity={0.12} stroke="none" />
+                  ) : null}
+                  {group.length > 1 ? (
+                    <SvgPath
+                      d={line}
+                      stroke={ACCENT}
+                      strokeWidth={2.5}
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ) : null}
+                </React.Fragment>
+              );
+            })}
+            {points.map((point, index) =>
+              point == null ? null : (
+                <SvgCircle
+                  key={labels[index] ?? index}
+                  cx={xFor(index, chartWidth)}
+                  cy={yFor(point)}
+                  r={index === todayIndex ? 5 : 4}
+                  fill={ACCENT}
+                />
+              ),
+            )}
+          </Svg>
+        ) : null}
+      </View>
+      {chartWidth > 0 ? (
+        <View style={{ height: 18, marginLeft: EMOJI_COL, marginTop: 6 }}>
+          {labels.map((label, index) => (
+            <Text
+              key={`${label}-${index}`}
+              numberOfLines={1}
+              style={{
+                position: "absolute",
+                left: xFor(index, chartWidth) - 16,
+                width: 32,
+                textAlign: "center",
+                fontSize: 11,
+                color: index === todayIndex ? ACCENT : "#9ca3af",
+                fontWeight: index === todayIndex ? "700" : "500",
+              }}
+            >
+              {label}
+            </Text>
+          ))}
+        </View>
+      ) : (
+        <View style={{ height: 24 }} />
+      )}
+    </View>
+  );
+}
+
+function MoodChart() {
+  const language = useSettingsStore((state) => state.language);
+  const moodLogs = useMoodStore((state) => state.moodLogs);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [width, setWidth] = useState(0);
+  const labels = weekLabels();
+  const today = todayLocalDateString();
+  const weekStart = addLocalDays(startOfWeekMonday(new Date()), weekOffset * 7);
+  const isCurrentWeek = weekOffset === 0;
+  const dates = Array.from({ length: 7 }, (_, index) =>
+    toLocalDateString(addLocalDays(weekStart, index)),
+  );
+  const points = dates.map((date) => {
+    const entry = moodLogs.find((logEntry) => logEntry.date === date);
+    return entry ? moodValue(entry.moodIndex) : null;
+  });
+  const todayIndex = dates.indexOf(today);
+  const logged = points.filter((point) => point != null);
+  const latest = [...points].reverse().find((point) => point != null);
+  const latestEmoji = latest == null ? null : Emojis[5 - latest];
+  const shiftWeek = (delta: number) => {
+    setWeekOffset((current) => Math.min(0, current + delta));
+  };
+
+  return (
+    <Board
+      title={i18n.t("mood_chart")}
+      trailing={
+        latestEmoji ? (
+          <Text style={{ fontSize: 28, lineHeight: 32 }}>{latestEmoji}</Text>
+        ) : null
+      }
+    >
+      <WeekSwitch
+        label={isCurrentWeek ? i18n.t("this_week") : weekRangeLabel(weekStart, language)}
+        canGoForward={weekOffset < 0}
+        onShift={shiftWeek}
+      />
+      {logged.length === 0 ? (
+        <Text className="text-sm text-gray-400 mb-3">
+          {i18n.t(isCurrentWeek ? "no_mood_this_week" : "no_mood_that_week")}
+        </Text>
+      ) : null}
+      <View
+        style={{ width: "100%" }}
+        onLayout={(event) => {
+          const next = event.nativeEvent.layout.width;
+          if (next > 0 && Math.abs(next - width) > 0.5) setWidth(next);
+        }}
+      >
+        <MoodLine
+          key={language}
+          points={points}
+          labels={labels}
+          todayIndex={todayIndex}
+          width={width}
+        />
+      </View>
+    </Board>
+  );
+}
+
+export default function HomeScreen() {
+  const scrollViewRef = React.useRef<ScrollView>(null);
+
+
 
   useScrollToTop(scrollViewRef);
 
   return (
-    <View className="flex-1 bg-gray-50/50">
+    <View className="flex-1 bg-gray-50" style={{ width: "100%", overflow: "hidden" }}>
       <ScrollView
         ref={scrollViewRef}
-        className="pt-4"
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsHorizontalScrollIndicator={false}
+        className="flex-1"
+        style={
+          (Platform.OS === "web"
+            ? { width: "100%", overflowAnchor: "none" }
+            : { width: "100%" }) as ViewStyle
+        }
+        contentContainerStyle={
+          {
+            width: "100%",
+            alignItems: "center",
+            paddingTop: 16,
+            paddingBottom: 96,
+            ...(Platform.OS === "web" ? { overflowAnchor: "none" } : null),
+          } as ViewStyle
+        }
         showsVerticalScrollIndicator={false}
       >
-        <WeeklyChart />
-        <MonthlyCalendar />
-        <MoodChart />
+        <View style={{ width: "100%", maxWidth: 576 }}>
+          <WeeklyChart />
+          <MonthlyCalendar />
+          <MoodChart />
+        </View>
       </ScrollView>
     </View>
   );

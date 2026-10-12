@@ -23,3 +23,21 @@ export function localDateToUTCRange(localDateStr: string): { start: string; end:
 export function utcToLocalDateString(isoUtc: string): string {
   return toLocalDateString(new Date(isoUtc));
 }
+
+// Local calendar day `days` away from `date`, at local midnight.
+export function addLocalDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+// Monday 00:00 local of the week that contains `date`. Sunday closes that week.
+export function startOfWeekMonday(date: Date): Date {
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return addLocalDays(date, mondayOffset);
+}
+
+// Every local midnight in `monthIndex` (0-11). Does not spill into the next month.
+export function datesInMonth(year: number, monthIndex: number): Date[] {
+  const count = new Date(year, monthIndex + 1, 0).getDate();
+  return Array.from({ length: count }, (_, day) => new Date(year, monthIndex, day + 1));
+}

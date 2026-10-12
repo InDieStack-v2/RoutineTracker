@@ -26,6 +26,14 @@ export default {
   mood_chart: "Biểu đồ tâm trạng",
   this_week: "Tuần này",
   this_month: "Tháng này",
+  no_tasks_this_week: "Chưa hoàn thành việc nào",
+  no_mood_this_week: "Chưa ghi tâm trạng",
+  previous_month: "Tháng trước",
+  next_month: "Tháng sau",
+  previous_week: "Tuần trước",
+  next_week: "Tuần sau",
+  no_tasks_that_week: "Không có việc hoàn thành",
+  no_mood_that_week: "Không có tâm trạng",
   home: "Trang chủ",
 
   // Tasks List

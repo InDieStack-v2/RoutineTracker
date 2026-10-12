@@ -3,9 +3,12 @@
  */
 
 import {
+  addLocalDays,
+  datesInMonth,
+  localDateToUTCRange,
+  startOfWeekMonday,
   toLocalDateString,
   todayLocalDateString,
-  localDateToUTCRange,
   utcToLocalDateString,
 } from '../dateUtils';
 
@@ -198,5 +201,49 @@ describe('utcToLocalDateString', () => {
   it('handles UTC+0 ISO strings with Z suffix', () => {
     const result = utcToLocalDateString('2025-01-15T05:00:00.000Z');
     expect(result).toBe('2025-01-15');
+  });
+});
+
+describe('startOfWeekMonday', () => {
+  it('returns the Monday on or before the given local day', () => {
+    const anchor = new Date(2026, 9, 14);
+    const start = startOfWeekMonday(anchor);
+    const anchorDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+
+    expect(start.getDay()).toBe(1);
+    expect(start.getHours()).toBe(0);
+    expect(start.getTime()).toBeLessThanOrEqual(anchorDay.getTime());
+    expect(addLocalDays(start, 6).getDay()).toBe(0);
+    expect(anchorDay.getTime()).toBeLessThanOrEqual(addLocalDays(start, 6).getTime());
+  });
+
+  it('keeps Sunday in the preceding Monday week', () => {
+    const monday = startOfWeekMonday(new Date(2026, 9, 14));
+    const sunday = addLocalDays(monday, 6);
+
+    expect(sunday.getDay()).toBe(0);
+    expect(startOfWeekMonday(sunday).getTime()).toBe(monday.getTime());
+    expect(startOfWeekMonday(monday).getTime()).toBe(monday.getTime());
+  });
+});
+
+describe('datesInMonth', () => {
+  it('does not spill a short month into the next month', () => {
+    const dates = datesInMonth(2026, 1);
+
+    expect(dates).toHaveLength(28);
+    expect(dates.every((date) => date.getMonth() === 1)).toBe(true);
+    expect(toLocalDateString(dates[0])).toBe('2026-02-01');
+    expect(toLocalDateString(dates[27])).toBe('2026-02-28');
+  });
+
+  it('includes day 31 only when the month has one', () => {
+    const october = datesInMonth(2026, 9);
+    const february = datesInMonth(2024, 1);
+
+    expect(october).toHaveLength(31);
+    expect(toLocalDateString(october[30])).toBe('2026-10-31');
+    expect(february).toHaveLength(29);
+    expect(toLocalDateString(february[28])).toBe('2024-02-29');
   });
 });

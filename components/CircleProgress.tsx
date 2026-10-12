@@ -1,46 +1,66 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 type ProgressCircleProps = {
   progressPercent: number;
   displayText: string;
   textColor?: string;
+  size?: number;
 };
 
-export const ProgressCircle = ({ progressPercent, displayText, textColor }: ProgressCircleProps) => {
-  const radius = 20;
-  const strokeWidth = 3;
+export const ProgressCircle = ({
+  progressPercent,
+  displayText,
+  textColor,
+  size = 32,
+}: ProgressCircleProps) => {
+  const strokeWidth = Math.max(2, size * 0.1);
+  const radius = size / 2;
   const normalizedRadius = radius - strokeWidth / 2;
   const circumference = normalizedRadius * 2 * Math.PI;
-  const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+  const percent = Math.max(
+    0,
+    Math.min(100, Number.isFinite(progressPercent) ? progressPercent : 0),
+  );
+  const strokeDashoffset = circumference - (percent / 100) * circumference;
 
   return (
-    <View style={styles.container}>
-      <Svg height={radius * 2} width={radius * 2}>
+    <View style={[styles.container, { width: size, height: size }]}>
+      <Svg height={size} width={size}>
         <Circle
-          stroke="#eeeeee"
+          stroke="#f3f4f6"
           fill="none"
           cx={radius}
           cy={radius}
           r={normalizedRadius}
           strokeWidth={strokeWidth}
         />
-        <Circle
-          stroke="#877cd4"
-          fill="none"
-          cx={radius}
-          cy={radius}
-          r={normalizedRadius}
-          strokeWidth={strokeWidth}
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${radius} ${radius})`}
-        />
+        {percent > 0 ? (
+          <Circle
+            stroke="#8882e7"
+            fill="none"
+            cx={radius}
+            cy={radius}
+            r={normalizedRadius}
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${radius} ${radius})`}
+          />
+        ) : null}
       </Svg>
       <View style={styles.textContainer}>
-        <Text style={{...styles.text, color: textColor ?? 'black'}}>{displayText}</Text>
+        <Text
+          style={{
+            fontSize: Math.max(10, Math.round(size * 0.34)),
+            fontWeight: '600',
+            color: textColor ?? '#4b5563',
+          }}
+        >
+          {displayText}
+        </Text>
       </View>
     </View>
   );
@@ -48,20 +68,13 @@ export const ProgressCircle = ({ progressPercent, displayText, textColor }: Prog
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   textContainer: {
-    position: 'absolute',
-    justifyContent: 'center',
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
-  },
-  text: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    justifyContent: 'center',
   },
 });
 

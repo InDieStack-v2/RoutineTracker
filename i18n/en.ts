@@ -26,6 +26,14 @@ export default {
   mood_chart: "Mood Chart",
   this_week: "This Week",
   this_month: "This Month",
+  no_tasks_this_week: "Nothing finished yet",
+  no_mood_this_week: "No mood logged yet",
+  previous_month: "Previous month",
+  next_month: "Next month",
+  previous_week: "Previous week",
+  next_week: "Next week",
+  no_tasks_that_week: "Nothing finished",
+  no_mood_that_week: "No mood logged",
   home: "Home",
 
   // Tasks List
