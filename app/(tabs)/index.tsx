@@ -20,7 +20,7 @@ import {
   toLocalDateString,
 } from "@/utils/dateUtils";
 import { useFocusEffect, useScrollToTop } from "expo-router";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react-native";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react-native";
 import React, { useCallback, useRef, useState } from "react";
 import {
   Modal,
@@ -384,9 +384,10 @@ type TaskChip = {
   label: string;
   icon?: string;
   color?: string;
+  deleted?: boolean;
 };
 
-const TOOLTIP_WIDTH = 220;
+const TOOLTIP_WIDTH = 248;
 const TOOLTIP_MARGIN = 12;
 const TOOLTIP_GAP = 10;
 const CARET_SIZE = 7;
@@ -434,8 +435,9 @@ function completedTasksFor(
             label: saved.label,
             icon: saved.icon ?? undefined,
             color: saved.color ?? undefined,
+            deleted: true,
           }
-        : { id, label: i18n.t("deleted_task") },
+        : { id, label: i18n.t("deleted_task"), deleted: true },
     );
   }
   const locale = language === "vi" ? "vi" : "en";
@@ -533,6 +535,49 @@ function tooltipPath(
   ].join(" ");
 }
 
+function TooltipTaskItem({ task }: { task: TaskChip }) {
+  return (
+    <View className="flex-row items-center" style={{ minHeight: 36 }}>
+      <View
+        className="items-center justify-center border border-gray-100"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          marginRight: 10,
+          backgroundColor: task.color ? `${task.color}20` : "#f3f4f6",
+          opacity: task.deleted ? 0.55 : 1,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 15,
+            lineHeight: 20,
+            height: 20,
+            textAlign: "center",
+            ...(Platform.OS === "android" ? { includeFontPadding: false } : null),
+          }}
+        >
+          {task.icon || (task.deleted ? "·" : "📝")}
+        </Text>
+      </View>
+      <Text
+        numberOfLines={1}
+        className={`flex-1 text-sm font-semibold ${
+          task.deleted ? "text-gray-400" : "text-gray-800"
+        }`}
+      >
+        {task.label}
+      </Text>
+      {task.deleted ? null : (
+        <View className="ml-2 h-5 w-5 items-center justify-center rounded-full bg-green-100">
+          <Icon as={CheckIcon} size="sm" className="text-green-600 w-3 h-3" />
+        </View>
+      )}
+    </View>
+  );
+}
+
 function DayTasksTooltip({
   anchor,
   title,
@@ -617,26 +662,9 @@ function DayTasksTooltip({
                 nestedScrollEnabled
                 showsVerticalScrollIndicator={false}
               >
-                {tasks.map((task) => (
-                  <View key={task.id} className="flex-row items-center py-1">
-                    {task.icon ? (
-                      <Text style={{ width: 22, fontSize: 14, textAlign: "center" }}>
-                        {task.icon}
-                      </Text>
-                    ) : (
-                      <View
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          marginHorizontal: 7,
-                          backgroundColor: task.color || ACCENT,
-                        }}
-                      />
-                    )}
-                    <Text numberOfLines={1} className="flex-1 text-sm text-gray-800">
-                      {task.label}
-                    </Text>
+                {tasks.map((task, index) => (
+                  <View key={task.id} style={{ marginTop: index === 0 ? 0 : 6 }}>
+                    <TooltipTaskItem task={task} />
                   </View>
                 ))}
               </ScrollView>
