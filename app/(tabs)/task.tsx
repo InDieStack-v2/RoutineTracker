@@ -1,19 +1,21 @@
 import { RoutineTaskService } from "@/services/routineTaskService";
 import { useCandyContext } from "@/store/context";
 import { useStreakStore } from "@/store/streakStore";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { DateTimeField } from "@/components/DateTimeField";
 import { useFocusEffect, useRouter, useScrollToTop } from "expo-router";
 import {
   ArrowRightIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   PlusIcon,
   XIcon,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  Modal,
   Platform,
+  Pressable,
   SectionList,
   Text,
   TouchableOpacity,
@@ -229,10 +231,144 @@ const RoutineTask = React.memo(
   ),
 );
 RoutineTask.displayName = "RoutineTask";
-
 // ── FilterTask ─────────────────────────────────────────────────────────────
 
 type FilterType = 'today' | 'yesterday' | 'custom';
+
+function DatePopup({
+  value,
+  onClose,
+  onSelect,
+}: {
+  value: Date;
+  onClose: () => void;
+  onSelect: (date: Date) => void;
+}) {
+  const [cursor, setCursor] = useState(
+    () => new Date(value.getFullYear(), value.getMonth(), 1),
+  );
+  const locale = i18n.locale === "vi" ? "vi-VN" : "en-US";
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const selectedKey = toLocalDateString(value);
+  const todayKey = toLocalDateString(new Date());
+  const labels = [
+    i18n.t("mon"),
+    i18n.t("tue"),
+    i18n.t("wed"),
+    i18n.t("thu"),
+    i18n.t("fri"),
+    i18n.t("sat"),
+    i18n.t("sun"),
+  ];
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <Pressable
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(17, 24, 39, 0.35)",
+          padding: 24,
+        }}
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={() => {}}
+          className="w-full bg-white rounded-3xl p-5 border border-gray-100"
+          style={
+            Platform.OS === "web"
+              ? ({
+                  maxWidth: 340,
+                  boxShadow: "0 12px 40px rgba(17, 24, 39, 0.16)",
+                } as ViewStyle)
+              : {
+                  maxWidth: 340,
+                  shadowColor: "#111827",
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.16,
+                  shadowRadius: 24,
+                  elevation: 8,
+                }
+          }
+        >
+          <View className="flex-row items-center justify-between mb-4">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t("previous_month")}
+              onPress={() => setCursor(new Date(year, month - 1, 1))}
+              className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+            >
+              <Icon as={ChevronLeftIcon} size="sm" className="text-gray-600" />
+            </Pressable>
+            <Text className="text-base font-semibold text-gray-900">
+              {cursor.toLocaleDateString(locale, { month: "long", year: "numeric" })}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t("next_month")}
+              onPress={() => setCursor(new Date(year, month + 1, 1))}
+              className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+            >
+              <Icon as={ChevronRightIcon} size="sm" className="text-gray-600" />
+            </Pressable>
+          </View>
+          <View className="flex-row mb-2">
+            {labels.map((label) => (
+              <Text
+                key={label}
+                className="text-xs font-semibold text-gray-400 text-center"
+                style={{ width: "14.28%" }}
+              >
+                {label}
+              </Text>
+            ))}
+          </View>
+          <View className="flex-row flex-wrap">
+            {Array.from({ length: startOffset }, (_, index) => (
+              <View key={`empty-${index}`} style={{ width: "14.28%", height: 40 }} />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, index) => {
+              const day = index + 1;
+              const date = new Date(year, month, day);
+              const key = toLocalDateString(date);
+              const selected = key === selectedKey;
+              const today = key === todayKey;
+              return (
+                <Pressable
+                  key={key}
+                  accessibilityRole="button"
+                  onPress={() => onSelect(date)}
+                  className="items-center justify-center"
+                  style={{ width: "14.28%", height: 40 }}
+                >
+                  <View
+                    className="h-8 w-8 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: selected ? "#8882e7" : "transparent",
+                      borderWidth: today && !selected ? 1 : 0,
+                      borderColor: "#8882e7",
+                    }}
+                  >
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: selected ? "#ffffff" : today ? "#8882e7" : "#374151" }}
+                    >
+                      {day}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
 
 interface FilterTaskProps {
   selectedDate: Date | null;
@@ -255,15 +391,12 @@ const FilterTask: React.FC<FilterTaskProps> = React.memo(
       selectedType === 'custom' && customDateLabel ? customDateLabel : i18n.t('other'),
     ];
 
-    const onDatePickerChange = useCallback(
-      (event: any, selectedDate?: Date) => {
+    const applyCustomDate = useCallback(
+      (date: Date) => {
+        onSelectedDateChange(date);
+        setSelectedType('custom');
+        setCustomDateLabel(toLocalDateString(date));
         setShowDatePicker(false);
-        if (event.type !== "dismissed" && selectedDate) {
-          onSelectedDateChange(selectedDate);
-          const dateString = toLocalDateString(selectedDate);
-          setSelectedType('custom');
-          setCustomDateLabel(dateString);
-        }
       },
       [onSelectedDateChange],
     );
@@ -286,28 +419,14 @@ const FilterTask: React.FC<FilterTaskProps> = React.memo(
     );
 
     return (
-      <View className="flex-row items-center mb-6 px-4 pt-2">
-        {showDatePicker && Platform.OS === "web" && (
-          <DateTimeField
-            mode="date"
+      <View className="mb-6 px-4 pt-2">
+        {showDatePicker ? (
+          <DatePopup
             value={selectedDate || new Date()}
-            onChange={(date) => {
-              setShowDatePicker(false);
-              onSelectedDateChange(date);
-              setSelectedType("custom");
-              setCustomDateLabel(toLocalDateString(date));
-            }}
+            onClose={() => setShowDatePicker(false)}
+            onSelect={applyCustomDate}
           />
-        )}
-        {showDatePicker && Platform.OS !== "web" && (
-          <DateTimePicker
-            testID="dateTimePicker"
-            value={selectedDate || new Date()}
-            mode={"date"}
-            is24Hour={true}
-            onChange={onDatePickerChange}
-          />
-        )}
+        ) : null}
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
