@@ -1,6 +1,5 @@
 import "@/global.css";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
-// import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -8,7 +7,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { CandyContext } from "@/store/context";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { candyStore } from "@/store/candyStore";
 import { useMoodStore } from "@/store/moodStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -22,11 +21,8 @@ import { migrateFromAsyncStorage } from "@/services/migration";
 type CandyProviderProps = React.PropsWithChildren<{}>;
 
 function CandyProvider({ children }: CandyProviderProps) {
-  // Zustand store or any other state management logic can be initialized here
-  const store = useRef(candyStore).current;
-
   return (
-    <CandyContext.Provider value={store}>
+    <CandyContext.Provider value={candyStore}>
       {children}
     </CandyContext.Provider>
   );

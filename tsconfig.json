@@ -11,7 +11,8 @@
         "./tailwind.config.js"
       ]
     },
-    "jsx": "react-native"
+    "jsx": "react-native",
+    "types": ["jest"]
   },
   "include": [
     "**/*.ts",

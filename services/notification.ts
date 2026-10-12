@@ -51,7 +51,10 @@ export const setupNotificationHandler = async () => {
   // 5. Add notification response listener
   Notifications.addNotificationResponseReceivedListener(response => {
     const actionIdentifier = response.actionIdentifier;
-    const taskId = response.notification.request.content.data.taskId as string;
+    const taskId = response.notification.request.content.data?.taskId;
+    if (typeof taskId !== "string") {
+      return;
+    }
 
     if (actionIdentifier === 'finish') {
       RoutineTaskService.finishRoutineTask(taskId);

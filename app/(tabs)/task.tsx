@@ -2,8 +2,7 @@ import { RoutineTaskService } from "@/services/routineTaskService";
 import { useCandyContext } from "@/store/context";
 import { useStreakStore } from "@/store/streakStore";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useScrollToTop } from "@react-navigation/native";
+import { useFocusEffect, useRouter, useScrollToTop } from "expo-router";
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -246,11 +245,6 @@ interface FilterTaskProps {
 }
 const FilterTask: React.FC<FilterTaskProps> = React.memo(
   ({ selectedDate, onSelectedDateChange }) => {
-    const [dateNames, setDateNames] = useState<string[]>([
-      i18n.t('today'),
-      i18n.t('yesterday'),
-      i18n.t('other'),
-    ]);
     const [selectedType, setSelectedType] = useState<FilterType>('today');
     const [customDateLabel, setCustomDateLabel] = useState<string | null>(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -260,14 +254,11 @@ const FilterTask: React.FC<FilterTaskProps> = React.memo(
       selectedType === 'yesterday' ? i18n.t('yesterday') :
       customDateLabel ?? i18n.t('other');
 
-    // Update dateNames when language or selection changes
-    useEffect(() => {
-      setDateNames([
-        i18n.t('today'),
-        i18n.t('yesterday'),
-        selectedType === 'custom' && customDateLabel ? customDateLabel : i18n.t('other'),
-      ]);
-    }, [i18n.locale, selectedType, customDateLabel]);
+    const dateNames = [
+      i18n.t('today'),
+      i18n.t('yesterday'),
+      selectedType === 'custom' && customDateLabel ? customDateLabel : i18n.t('other'),
+    ];
 
     const onDatePickerChange = useCallback(
       (event: any, selectedDate?: Date) => {

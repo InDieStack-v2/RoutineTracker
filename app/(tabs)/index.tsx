@@ -4,8 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import log from "@/services/logger";
 import { RoutineTaskService } from "@/services/routineTaskService";
 import { toLocalDateString } from "@/utils/dateUtils";
-import { useFocusEffect } from "expo-router";
-import { useScrollToTop } from "@react-navigation/native";
+import { useFocusEffect, useScrollToTop } from "expo-router";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,

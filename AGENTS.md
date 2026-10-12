@@ -98,10 +98,10 @@ This document provides essential information for AI agents working on the `routi
 
 ## 7. Dependencies Note
 
-*   **Expo:** ~53.0.20
-*   **React Native:** 0.79.5
-*   **React:** 19.0.0
+*   **Expo:** ~57.0.27
+*   **React Native:** 0.86.3
+*   **React:** 19.2.3
 *   **Gluestack UI:** v1
-*   **NativeWind:** v4
+*   **NativeWind:** 4.2.7
 
 Always check `package.json` for the exact versions before assuming API availability.

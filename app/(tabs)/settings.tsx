@@ -13,6 +13,34 @@ import { Stack } from "expo-router";
 import { Icon } from "@/components/ui/icon";
 import { scheduleNotificationsForRoutineTasks } from "@/services/notification";
 
+function LanguageOption({
+  label,
+  value,
+  language,
+  onSelect,
+}: {
+  label: string;
+  value: "en" | "vi";
+  language: "en" | "vi";
+  onSelect: (value: "en" | "vi") => void;
+}) {
+  const isSelected = language === value;
+  return (
+    <Pressable onPress={() => onSelect(value)}>
+      <HStack className="justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
+        <Text
+          className={`text-base ${isSelected ? "text-gray-900 font-medium" : "text-gray-600"}`}
+        >
+          {label}
+        </Text>
+        {isSelected && (
+          <Icon as={CheckIcon} className="text-primary-500 w-5 h-5" />
+        )}
+      </HStack>
+    </Pressable>
+  );
+}
+
 export default function SettingScreen() {
   const { language, setLanguage, reminderTime, setReminderTime } =
     useSettingsStore();
@@ -48,29 +76,6 @@ export default function SettingScreen() {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const LanguageOption = ({
-    label,
-    value,
-  }: {
-    label: string;
-    value: "en" | "vi";
-  }) => {
-    const isSelected = language === value;
-    return (
-      <Pressable onPress={() => setLanguage(value)}>
-        <HStack className="justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
-          <Text
-            className={`text-base ${isSelected ? "text-gray-900 font-medium" : "text-gray-600"}`}
-          >
-            {label}
-          </Text>
-          {isSelected && (
-            <Icon as={CheckIcon} className="text-primary-500 w-5 h-5" />
-          )}
-        </HStack>
-      </Pressable>
-    );
-  };
 
   return (
     <Box className="flex-1 bg-gray-50">
@@ -92,9 +97,19 @@ export default function SettingScreen() {
             className="bg-white rounded-xl px-4 py-1 border border-gray-100"
             style={styles.shadow}
           >
-            <LanguageOption label={i18n.t("english")} value="en" />
+            <LanguageOption
+              label={i18n.t("english")}
+              value="en"
+              language={language}
+              onSelect={setLanguage}
+            />
             <Box className="h-[1px] bg-gray-100" />
-            <LanguageOption label={i18n.t("vietnamese")} value="vi" />
+            <LanguageOption
+              label={i18n.t("vietnamese")}
+              value="vi"
+              language={language}
+              onSelect={setLanguage}
+            />
           </Box>
         </VStack>
 
