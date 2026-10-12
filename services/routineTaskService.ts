@@ -12,6 +12,13 @@ export interface UserRoutineTask extends RoutineTask {
   isDone: boolean;
 }
 
+export type RoutineTaskSummary = {
+  id: string;
+  label: string;
+  icon: string | null;
+  color: string | null;
+};
+
 export class RoutineTaskService {
   public static async getFilteredRoutineTasks(
     routineTasks: RoutineTask[],
@@ -178,6 +185,34 @@ export class RoutineTaskService {
       );
       // Return empty arrays for all requested dates in case of error
       return dates.map(() => []);
+    }
+  }
+
+  public static async getRoutineTaskSummaries(
+    ids: string[],
+  ): Promise<RoutineTaskSummary[]> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    log.info("[RoutineTaskService] Getting routine task summaries", {
+      count: unique.length,
+    });
+
+    if (unique.length === 0) {
+      return [];
+    }
+
+    const db = await getDB();
+    const placeholders = unique.map(() => "?").join(", ");
+
+    try {
+      return await db.getAllAsync<RoutineTaskSummary>(
+        `SELECT id, label, icon, color FROM routine_tasks WHERE id IN (${placeholders})`,
+        unique,
+      );
+    } catch (error) {
+      log.error("[RoutineTaskService] Error getting routine task summaries", {
+        error,
+      });
+      return [];
     }
   }
 

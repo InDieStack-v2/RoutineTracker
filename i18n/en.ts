@@ -34,6 +34,8 @@ export default {
   previous_week: "Previous week",
   next_week: "Next week",
   no_tasks_that_week: "Nothing finished",
+  no_tasks_that_day: "Nothing finished",
+  deleted_task: "Deleted task",
   no_mood_that_week: "No mood logged",
   home: "Home",
 

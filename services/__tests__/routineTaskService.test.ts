@@ -452,6 +452,44 @@ describe('getFinishedRoutineTasksForDates', () => {
   });
 });
 
+describe('getRoutineTaskSummaries', () => {
+  it('returns [] when ids is empty and does not query', async () => {
+    const result = await RoutineTaskService.getRoutineTaskSummaries([]);
+    expect(result).toEqual([]);
+    expect(mockDb.getAllAsync).not.toHaveBeenCalled();
+  });
+
+  it('returns labels for completed tasks, including deleted rows', async () => {
+    mockDb.getAllAsync.mockResolvedValue([
+      { id: 'task-1', label: 'Read', icon: '📚', color: '#8882e7' },
+      { id: 'task-2', label: 'Old task', icon: null, color: null },
+    ]);
+
+    const result = await RoutineTaskService.getRoutineTaskSummaries([
+      'task-1',
+      'task-1',
+      'task-2',
+    ]);
+
+    expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+      'SELECT id, label, icon, color FROM routine_tasks WHERE id IN (?, ?)',
+      ['task-1', 'task-2'],
+    );
+    expect(result).toEqual([
+      { id: 'task-1', label: 'Read', icon: '📚', color: '#8882e7' },
+      { id: 'task-2', label: 'Old task', icon: null, color: null },
+    ]);
+  });
+
+  it('returns [] when the lookup throws', async () => {
+    mockDb.getAllAsync.mockRejectedValue(new Error('DB error'));
+
+    const result = await RoutineTaskService.getRoutineTaskSummaries(['task-1']);
+
+    expect(result).toEqual([]);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // getDailyReminderTime
 // ─────────────────────────────────────────────────────────────────────────────

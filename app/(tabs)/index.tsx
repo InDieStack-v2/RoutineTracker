@@ -3,7 +3,12 @@ import { Icon } from "@/components/ui/icon";
 import { Emojis } from "@/constants/Moods";
 import i18n from "@/i18n";
 import log from "@/services/logger";
-import { RoutineTaskService } from "@/services/routineTaskService";
+import {
+  RoutineTaskService,
+  type RoutineTaskSummary,
+} from "@/services/routineTaskService";
+import { useCandyContext } from "@/store/context";
+import type { RoutineTask } from "@/store/candyStore";
 import { useMoodStore } from "@/store/moodStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import {
@@ -17,10 +22,13 @@ import { useFocusEffect, useScrollToTop } from "expo-router";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react-native";
 import React, { useCallback, useRef, useState } from "react";
 import {
+  Modal,
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type ViewStyle,
 } from "react-native";
@@ -54,6 +62,7 @@ const cardShadow = (
 type DayMark = {
   done: boolean;
   rate: number;
+  taskIds: string[];
 };
 
 type WeekCount = {
@@ -368,13 +377,293 @@ function WeekSwitch({
   );
 }
 
+type DayAnchor = {
+  date: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type TaskChip = {
+  id: string;
+  label: string;
+  icon?: string;
+  color?: string;
+};
+
+const TOOLTIP_WIDTH = 220;
+const TOOLTIP_MARGIN = 12;
+const TOOLTIP_GAP = 10;
+const CARET_SIZE = 7;
+const CARET_HALF = 8;
+const CARET_WIDTH = CARET_HALF * 2;
+const CARET_INSET = 16;
+const TOOLTIP_BORDER = "#f3f4f6";
+
+function dayLabel(dateStr: string, language: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const locale = language === "vi" ? "vi-VN" : "en-US";
+  return new Date(year, month - 1, day).toLocaleDateString(locale, {
+    month: "short",
+    day: "numeric",
+    ...(year !== new Date().getFullYear() ? { year: "numeric" } : {}),
+  });
+}
+
+function completedTasksFor(
+  ids: string[],
+  routineTasks: RoutineTask[],
+  summaries: Record<string, RoutineTaskSummary>,
+  language: string,
+): TaskChip[] {
+  const seen: Record<string, true> = {};
+  const tasks: TaskChip[] = [];
+  for (const id of ids) {
+    if (seen[id]) continue;
+    seen[id] = true;
+    const live = routineTasks.find((task) => task.id === id && !task.deletedAt);
+    if (live) {
+      tasks.push({
+        id,
+        label: live.label,
+        icon: live.icon,
+        color: live.color,
+      });
+      continue;
+    }
+    const saved = summaries[id];
+    tasks.push(
+      saved
+        ? {
+            id,
+            label: saved.label,
+            icon: saved.icon ?? undefined,
+            color: saved.color ?? undefined,
+          }
+        : { id, label: i18n.t("deleted_task") },
+    );
+  }
+  const locale = language === "vi" ? "vi" : "en";
+  return tasks.sort((a, b) => a.label.localeCompare(b.label, locale));
+}
+
+function tooltipFrame(
+  anchor: DayAnchor,
+  tipWidth: number,
+  tipHeight: number,
+  screenWidth: number,
+  screenHeight: number,
+): { left: number; top: number; placeBelow: boolean; caretLeft: number } {
+  const belowTop = anchor.y + anchor.height + TOOLTIP_GAP + CARET_SIZE;
+  const aboveTop = anchor.y - TOOLTIP_GAP - CARET_SIZE - tipHeight;
+  const fitsBelow =
+    tipHeight === 0 || belowTop + tipHeight <= screenHeight - TOOLTIP_MARGIN;
+  const fitsAbove = tipHeight > 0 && aboveTop >= TOOLTIP_MARGIN;
+  const placeBelow = fitsBelow || !fitsAbove;
+  const top = Math.round(
+    placeBelow
+      ? Math.min(
+          belowTop,
+          Math.max(TOOLTIP_MARGIN, screenHeight - TOOLTIP_MARGIN - Math.max(tipHeight, 1)),
+        )
+      : Math.max(TOOLTIP_MARGIN, aboveTop),
+  );
+  const left = Math.round(
+    Math.min(
+      Math.max(TOOLTIP_MARGIN, anchor.x + anchor.width / 2 - tipWidth / 2),
+      Math.max(TOOLTIP_MARGIN, screenWidth - TOOLTIP_MARGIN - tipWidth),
+    ),
+  );
+  const caretLeft = Math.round(
+    Math.min(
+      Math.max(CARET_INSET, anchor.x + anchor.width / 2 - left - CARET_HALF),
+      tipWidth - CARET_INSET - CARET_WIDTH,
+    ),
+  );
+  return { left, top, placeBelow, caretLeft };
+}
+
+function tooltipPath(
+  width: number,
+  height: number,
+  caretLeft: number,
+  up: boolean,
+): string {
+  const inset = 1;
+  const radius = 16;
+  const x0 = inset;
+  const x1 = width - inset;
+  const y0 = inset;
+  const y1 = height - inset;
+  const bodyTop = up ? y0 + CARET_SIZE : y0;
+  const bodyBottom = up ? y1 : y1 - CARET_SIZE;
+  const center = caretLeft + CARET_HALF;
+  const notchStart = Math.max(x0 + radius, center - CARET_HALF);
+  const notchEnd = Math.min(x1 - radius, center + CARET_HALF);
+  const peakY = up ? y0 : y1;
+  const baseY = up ? bodyTop : bodyBottom;
+
+  if (up) {
+    return [
+      `M ${x0 + radius} ${bodyTop}`,
+      `H ${notchStart}`,
+      `L ${center} ${peakY}`,
+      `L ${notchEnd} ${baseY}`,
+      `H ${x1 - radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x1} ${bodyTop + radius}`,
+      `V ${bodyBottom - radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x1 - radius} ${bodyBottom}`,
+      `H ${x0 + radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x0} ${bodyBottom - radius}`,
+      `V ${bodyTop + radius}`,
+      `A ${radius} ${radius} 0 0 1 ${x0 + radius} ${bodyTop}`,
+      "Z",
+    ].join(" ");
+  }
+
+  return [
+    `M ${x0 + radius} ${bodyTop}`,
+    `H ${x1 - radius}`,
+    `A ${radius} ${radius} 0 0 1 ${x1} ${bodyTop + radius}`,
+    `V ${bodyBottom - radius}`,
+    `A ${radius} ${radius} 0 0 1 ${x1 - radius} ${bodyBottom}`,
+    `H ${notchEnd}`,
+    `L ${center} ${peakY}`,
+    `L ${notchStart} ${baseY}`,
+    `H ${x0 + radius}`,
+    `A ${radius} ${radius} 0 0 1 ${x0} ${bodyBottom - radius}`,
+    `V ${bodyTop + radius}`,
+    `A ${radius} ${radius} 0 0 1 ${x0 + radius} ${bodyTop}`,
+    "Z",
+  ].join(" ");
+}
+
+function DayTasksTooltip({
+  anchor,
+  title,
+  tasks,
+  onClose,
+}: {
+  anchor: DayAnchor;
+  title: string;
+  tasks: TaskChip[];
+  onClose: () => void;
+}) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const [tipHeight, setTipHeight] = useState(0);
+  const tipWidth = Math.min(TOOLTIP_WIDTH, screenWidth - TOOLTIP_MARGIN * 2);
+  const frame = tooltipFrame(anchor, tipWidth, tipHeight, screenWidth, screenHeight);
+
+  return (
+    <Modal
+      transparent
+      visible
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={i18n.t("cancel")}
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          onLayout={(event) => {
+            const next = event.nativeEvent.layout.height;
+            if (next > 0 && Math.abs(next - tipHeight) > 0.5) setTipHeight(next);
+          }}
+          style={{
+            position: "absolute",
+            left: frame.left,
+            top: frame.top,
+            width: tipWidth,
+            opacity: tipHeight > 0 ? 1 : 0,
+            zIndex: 2,
+            overflow: "visible",
+            ...cardShadow,
+            elevation: 0,
+          }}
+        >
+          {tipHeight > 0 ? (
+            <Svg
+              pointerEvents="none"
+              width={tipWidth}
+              height={tipHeight + CARET_SIZE}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: frame.placeBelow ? -CARET_SIZE : 0,
+              }}
+            >
+              <SvgPath
+                d={tooltipPath(
+                  tipWidth,
+                  tipHeight + CARET_SIZE,
+                  frame.caretLeft,
+                  frame.placeBelow,
+                )}
+                fill="#ffffff"
+                stroke={TOOLTIP_BORDER}
+                strokeWidth={1}
+                strokeLinejoin="miter"
+                strokeMiterlimit={4}
+              />
+            </Svg>
+          ) : null}
+          <View className="px-3 py-3">
+            <Text className="text-xs font-semibold text-gray-400 mb-2">{title}</Text>
+            {tasks.length === 0 ? (
+              <Text className="text-sm text-gray-400">{i18n.t("no_tasks_that_day")}</Text>
+            ) : (
+              <ScrollView
+                style={{ maxHeight: 180 }}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+              >
+                {tasks.map((task) => (
+                  <View key={task.id} className="flex-row items-center py-1">
+                    {task.icon ? (
+                      <Text style={{ width: 22, fontSize: 14, textAlign: "center" }}>
+                        {task.icon}
+                      </Text>
+                    ) : (
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          marginHorizontal: 7,
+                          backgroundColor: task.color || ACCENT,
+                        }}
+                      />
+                    )}
+                    <Text numberOfLines={1} className="flex-1 text-sm text-gray-800">
+                      {task.label}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function MonthlyCalendar() {
   const language = useSettingsStore((state) => state.language);
+  const routineTasks = useCandyContext((state) => state.routineTasks);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const [marks, setMarks] = useState<Record<string, DayMark>>({});
+  const [summaries, setSummaries] = useState<Record<string, RoutineTaskSummary>>({});
+  const [anchor, setAnchor] = useState<DayAnchor | null>(null);
   const [cellWidth, setCellWidth] = useState(0);
   const labels = weekLabels();
   const today = todayLocalDateString();
@@ -385,6 +674,7 @@ function MonthlyCalendar() {
     cellWidth > 0 ? Math.min(40, Math.max(24, Math.floor(cellWidth) - 8)) : 28;
   const monthRef = useRef(visibleMonth);
   const requestId = useRef(0);
+  const cellRefs = useRef<Record<string, View | null>>({});
 
   const loadMonth = useCallback(async (nextYear: number, nextMonth: number) => {
     const id = ++requestId.current;
@@ -398,13 +688,21 @@ function MonthlyCalendar() {
       const next: Record<string, DayMark> = {};
       dates.forEach((date, index) => {
         const key = toLocalDateString(date);
-        const done = (finished[index]?.length ?? 0) > 0;
+        const taskIds = finished[index] ?? [];
+        const done = taskIds.length > 0;
         const rate = rates[index] ?? 0;
         if (done || rate > 0) {
-          next[key] = { done, rate };
+          next[key] = { done, rate, taskIds };
         }
       });
       setMarks(next);
+      const rows = await RoutineTaskService.getRoutineTaskSummaries(finished.flat());
+      if (id !== requestId.current) return;
+      const nextSummaries: Record<string, RoutineTaskSummary> = {};
+      for (const row of rows) {
+        nextSummaries[row.id] = row;
+      }
+      setSummaries(nextSummaries);
     } catch (error) {
       log.error("[HomeScreen] Failed to load calendar", { error });
     }
@@ -415,8 +713,37 @@ function MonthlyCalendar() {
     const nextDate = new Date(current.year, current.month + delta, 1);
     const next = { year: nextDate.getFullYear(), month: nextDate.getMonth() };
     monthRef.current = next;
+    setAnchor(null);
     setVisibleMonth(next);
     loadMonth(next.year, next.month);
+  };
+
+  const openDay = (dateStr: string) => {
+    if (anchor?.date === dateStr) {
+      setAnchor(null);
+      return;
+    }
+    const node = cellRefs.current[dateStr];
+    if (Platform.OS === "web") {
+      const webNode = document.getElementById(`cal-${dateStr}`);
+      if (webNode) {
+        const rect = webNode.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          setAnchor({
+            date: dateStr,
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+          });
+          return;
+        }
+      }
+    }
+    node?.measureInWindow((x, y, width, height) => {
+      if (width <= 0 || height <= 0) return;
+      setAnchor({ date: dateStr, x, y, width, height });
+    });
   };
 
   useFocusEffect(
@@ -429,65 +756,116 @@ function MonthlyCalendar() {
     }, [loadMonth]),
   );
 
+  const selectedTasks = anchor
+    ? completedTasksFor(
+        marks[anchor.date]?.taskIds ?? [],
+        routineTasks,
+        summaries,
+        language,
+      )
+    : [];
+
   return (
-    <Board
-      eyebrow={i18n.t("calendar_stats")}
-      title={monthLabel(year, month, language)}
-      trailing={
-        <View className="flex-row items-center gap-2">
-          <MonthArrow direction="left" onPress={() => shiftMonth(-1)} />
-          <MonthArrow direction="right" onPress={() => shiftMonth(1)} />
-        </View>
-      }
-    >
-      <View className="flex-row mb-2">
-        {labels.map((label) => (
-          <Text
-            key={label}
-            numberOfLines={1}
-            className="text-xs font-semibold text-gray-400 text-center"
-            style={{ width: "14.28%" }}
-          >
-            {label}
-          </Text>
-        ))}
-      </View>
-      <View
-        className="flex-row flex-wrap"
-        onLayout={(event) => {
-          const next = event.nativeEvent.layout.width / 7;
-          if (next > 0 && Math.abs(next - cellWidth) > 0.5) {
-            setCellWidth(next);
-          }
-        }}
+    <>
+      <Board
+        eyebrow={i18n.t("calendar_stats")}
+        title={monthLabel(year, month, language)}
+        trailing={
+          <View className="flex-row items-center gap-2">
+            <MonthArrow direction="left" onPress={() => shiftMonth(-1)} />
+            <MonthArrow direction="right" onPress={() => shiftMonth(1)} />
+          </View>
+        }
       >
-        {Array.from({ length: startOffset }, (_, index) => (
-          <View key={`empty-${index}`} style={{ width: "14.28%", height: ringSize + 8 }} />
-        ))}
-        {days.map((date) => {
-          const dateStr = toLocalDateString(date);
-          const isToday = dateStr === today;
-          const isFuture = dateStr > today;
-          const percent = isFuture ? 0 : completionPercent(marks[dateStr]);
-          return (
-            <View
-              key={dateStr}
-              className="items-center justify-center"
-              style={{ width: "14.28%", height: ringSize + 8 }}
+        <View className="flex-row mb-2">
+          {labels.map((label) => (
+            <Text
+              key={label}
+              numberOfLines={1}
+              className="text-xs font-semibold text-gray-400 text-center"
+              style={{ width: "14.28%" }}
             >
-              <ProgressCircle
-                size={ringSize}
-                progressPercent={percent}
-                displayText={String(date.getDate())}
-                textColor={
-                  isFuture ? "#d1d5db" : isToday || percent > 0 ? ACCENT : "#4b5563"
+              {label}
+            </Text>
+          ))}
+        </View>
+        <View
+          className="flex-row flex-wrap"
+          onLayout={(event) => {
+            const next = event.nativeEvent.layout.width / 7;
+            if (next > 0 && Math.abs(next - cellWidth) > 0.5) {
+              setCellWidth(next);
+            }
+          }}
+        >
+          {Array.from({ length: startOffset }, (_, index) => (
+            <View key={`empty-${index}`} style={{ width: "14.28%", height: ringSize + 8 }} />
+          ))}
+          {days.map((date) => {
+            const dateStr = toLocalDateString(date);
+            const isToday = dateStr === today;
+            const isFuture = dateStr > today;
+            const selected = anchor?.date === dateStr;
+            const percent = isFuture ? 0 : completionPercent(marks[dateStr]);
+            const dayTasks = completedTasksFor(
+              marks[dateStr]?.taskIds ?? [],
+              routineTasks,
+              summaries,
+              language,
+            );
+            const label = dayLabel(dateStr, language);
+            const taskNames = dayTasks.map((task) => task.label).join(", ");
+            return (
+              <Pressable
+                key={dateStr}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isFuture, selected }}
+                accessibilityLabel={
+                  taskNames ? `${label}, ${taskNames}` : `${label}, ${i18n.t("no_tasks_that_day")}`
                 }
-              />
-            </View>
-          );
-        })}
-      </View>
-    </Board>
+                disabled={isFuture}
+                onPress={() => openDay(dateStr)}
+                className="items-center justify-center"
+                style={{ width: "14.28%", height: ringSize + 8 }}
+              >
+                <View
+                  nativeID={`cal-${dateStr}`}
+                  ref={(node) => {
+                    cellRefs.current[dateStr] = node;
+                  }}
+                  collapsable={false}
+                  style={{
+                    borderRadius: ringSize / 2,
+                    backgroundColor: selected ? ACCENT_SOFT : "transparent",
+                  }}
+                >
+                  <ProgressCircle
+                    size={ringSize}
+                    progressPercent={percent}
+                    displayText={String(date.getDate())}
+                    textColor={
+                      isFuture
+                        ? "#d1d5db"
+                        : selected || isToday || percent > 0
+                          ? ACCENT
+                          : "#4b5563"
+                    }
+                  />
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Board>
+      {anchor ? (
+        <DayTasksTooltip
+          anchor={anchor}
+          title={dayLabel(anchor.date, language)}
+          tasks={selectedTasks}
+          onClose={() => setAnchor(null)}
+        />
+      ) : null}
+    </>
   );
 }
 

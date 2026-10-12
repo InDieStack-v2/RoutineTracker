@@ -34,6 +34,8 @@ export default {
   previous_week: "Tuần trước",
   next_week: "Tuần sau",
   no_tasks_that_week: "Không có việc hoàn thành",
+  no_tasks_that_day: "Không có việc hoàn thành",
+  deleted_task: "Công việc đã xóa",
   no_mood_that_week: "Không có tâm trạng",
   home: "Trang chủ",
 
