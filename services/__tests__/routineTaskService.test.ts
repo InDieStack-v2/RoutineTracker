@@ -22,7 +22,7 @@ jest.mock('@/store/settingsStore', () => ({
 }));
 jest.mock('../logger');
 
-import { RoutineTaskService } from '../routineTaskService';
+import { RoutineTaskService, isTaskScheduledOn } from '../routineTaskService';
 import { getDB } from '@/services/db';
 import { useSettingsStore } from '@/store/settingsStore';
 import { localDateToUTCRange } from '@/utils/dateUtils';
@@ -237,6 +237,106 @@ describe('getFilteredRoutineTasks', () => {
     );
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('schedule filtering', () => {
+  const wednesday = new Date(2025, 0, 15);
+  const thursday = new Date(2025, 0, 16);
+  const monday = new Date(2025, 0, 13);
+
+  beforeEach(() => {
+    mockDb.getAllAsync.mockResolvedValue([]);
+  });
+
+  it('keeps legacy tasks with no repeat on every day', () => {
+    expect(isTaskScheduledOn(makeTask(), wednesday)).toBe(true);
+  });
+
+  it('shows a daily task only on selected weekdays', async () => {
+    const tasks = [
+      makeTask({ id: 't1', repeat: 'daily', repeatValues: ['Mon', 'Wed'] }),
+    ];
+
+    const onWednesday = await RoutineTaskService.getFilteredRoutineTasks(tasks, wednesday);
+    const onThursday = await RoutineTaskService.getFilteredRoutineTasks(tasks, thursday);
+
+    expect(onWednesday.map((task) => task.id)).toEqual(['t1']);
+    expect(onWednesday[0].isHidden).toBe(false);
+    expect(onThursday).toEqual([]);
+  });
+
+  it('hides a daily task when on-these-days is explicitly empty', () => {
+    expect(
+      isTaskScheduledOn(makeTask({ repeat: 'daily', repeatValues: [] }), wednesday),
+    ).toBe(false);
+  });
+
+  it('shows a weekly task on selected weekdays, not the created weekday', () => {
+    const task = makeTask({
+      repeat: 'weekly',
+      repeatValues: ['Mon'],
+      createdAt: wednesday,
+    });
+
+    expect(isTaskScheduledOn(task, monday)).toBe(true);
+    expect(isTaskScheduledOn(task, wednesday)).toBe(false);
+  });
+
+  it('falls back to the created weekday when weekly values are missing', () => {
+    const task = makeTask({ repeat: 'weekly', createdAt: wednesday });
+
+    expect(isTaskScheduledOn(task, wednesday)).toBe(true);
+    expect(isTaskScheduledOn(task, thursday)).toBe(false);
+  });
+
+  it('shows a monthly task on the selected day and clamps short months', () => {
+    const task = makeTask({ repeat: 'monthly', repeatValues: ['31'] });
+
+    expect(isTaskScheduledOn(task, new Date(2025, 0, 31))).toBe(true);
+    expect(isTaskScheduledOn(task, new Date(2025, 0, 30))).toBe(false);
+    expect(isTaskScheduledOn(task, new Date(2025, 1, 28))).toBe(true);
+    expect(isTaskScheduledOn(task, new Date(2025, 1, 27))).toBe(false);
+    expect(isTaskScheduledOn(task, new Date(2024, 1, 29))).toBe(true);
+    expect(isTaskScheduledOn(task, new Date(2025, 3, 30))).toBe(true);
+  });
+
+  it('falls back to the created day of month when monthly values are missing', () => {
+    const task = makeTask({ repeat: 'monthly', createdAt: new Date(2025, 0, 31) });
+
+    expect(isTaskScheduledOn(task, new Date(2025, 2, 31))).toBe(true);
+    expect(isTaskScheduledOn(task, new Date(2025, 1, 28))).toBe(true);
+    expect(isTaskScheduledOn(task, new Date(2025, 1, 15))).toBe(false);
+  });
+
+  it('returns scheduled and hidden tasks when includeHidden is set', async () => {
+    const tasks = [
+      makeTask({ id: 'due', repeat: 'daily', repeatValues: ['Wed'] }),
+      makeTask({ id: 'off', repeat: 'daily', repeatValues: ['Mon'] }),
+      makeTask({ id: 'future', createdAt: thursday, repeat: 'daily' }),
+      makeTask({ id: 'ended', endDate: monday, repeat: 'daily' }),
+    ];
+
+    const hidden = await RoutineTaskService.getFilteredRoutineTasks(tasks, wednesday, {
+      includeHidden: true,
+    });
+    const visible = await RoutineTaskService.getFilteredRoutineTasks(tasks, wednesday);
+
+    expect(hidden.map((task) => task.id).sort()).toEqual(['due', 'off']);
+    expect(hidden.find((task) => task.id === 'due')?.isHidden).toBe(false);
+    expect(hidden.find((task) => task.id === 'off')?.isHidden).toBe(true);
+    expect(visible.map((task) => task.id)).toEqual(['due']);
+  });
+
+  it('does not apply the schedule when no date is given', async () => {
+    const tasks = [makeTask({ id: 't1', repeat: 'weekly', repeatValues: ['Mon'] })];
+
+    const result = await RoutineTaskService.getFilteredRoutineTasks(tasks, null, {
+      includeHidden: true,
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].isHidden).toBe(false);
   });
 });
 

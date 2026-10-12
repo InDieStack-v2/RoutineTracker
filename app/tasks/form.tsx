@@ -11,10 +11,11 @@ import { Text } from "@/components/ui/text";
 import { Heading } from "@/components/ui/heading";
 import { Icon } from "@/components/ui/icon";
 import { CheckIcon, ArrowLeftIcon } from "lucide-react-native";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Control, type UseFormSetValue } from "react-hook-form";
 import { Grid, GridItem } from "@/components/ui/grid";
 import { useCandyContext } from "@/store/context";
 import i18n from "@/i18n";
+import { WEEKDAY_KEYS } from "@/utils/dateUtils";
 
 const COLORS = [
   "#FFFFCD",
@@ -152,7 +153,22 @@ const DoItAtInput = React.memo(({ control }: { control: any; errors: any }) => {
 });
 DoItAtInput.displayName = "DoItAtInput";
 
-const RepeatInput = React.memo(({ control }: { control: any; errors: any }) => {
+type TaskFormValues = {
+  name: string;
+  color?: string;
+  icon?: string;
+  doItAt?: string;
+  repeat: "daily" | "weekly" | "monthly";
+  repeatValues: string[];
+};
+
+const RepeatInput = React.memo(({
+  control,
+  setValue,
+}: {
+  control: Control<TaskFormValues>;
+  setValue: UseFormSetValue<TaskFormValues>;
+}) => {
   const options = ["daily", "weekly", "monthly"];
 
   const RepeatOptionView = ({
@@ -171,13 +187,23 @@ const RepeatInput = React.memo(({ control }: { control: any; errors: any }) => {
           {options.map((option) => (
             <Pressable
               key={option}
-              onPress={() => onChange(option)}
-              disabled={option !== "daily"} // Keeping original logic
+              onPress={() => {
+                if (option === repeatType) return;
+                onChange(option);
+                const today = new Date();
+                if (option === "weekly") {
+                  setValue("repeatValues", [WEEKDAY_KEYS[today.getDay()]]);
+                } else if (option === "monthly") {
+                  setValue("repeatValues", [String(today.getDate())]);
+                } else {
+                  setValue("repeatValues", [...WEEKDAY_KEYS]);
+                }
+              }}
               className={`flex-1 py-3 px-2 rounded-xl items-center justify-center border ${
                 repeatType === option
                   ? "bg-[#8882e7] border-[#8882e7]"
                   : "bg-gray-50 border-gray-200"
-              } ${option !== "daily" ? "opacity-50" : ""}`}
+              }`}
             >
               <Text
                 className={`text-sm font-semibold capitalize ${
@@ -265,6 +291,60 @@ const RepeatInput = React.memo(({ control }: { control: any; errors: any }) => {
     );
   };
 
+  const MonthDaysView = ({
+    repeatValues,
+    onChange,
+  }: {
+    repeatValues: string[];
+    onChange: (values: string[]) => void;
+  }) => {
+    return (
+      <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4">
+        <Heading size="md" className="mb-4 text-gray-800">
+          {i18n.t("on_these_days")}
+        </Heading>
+        <View className="flex-row flex-wrap">
+          {Array.from({ length: 31 }, (_, index) => {
+            const day = String(index + 1);
+            const selected = repeatValues.includes(day);
+            return (
+              <Pressable
+                key={day}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  onChange(
+                    selected
+                      ? repeatValues.filter((value) => value !== day)
+                      : [...repeatValues, day],
+                  );
+                }}
+                className="items-center justify-center"
+                style={{ width: "14.28%", height: 40 }}
+              >
+                <View
+                  className={`h-8 w-8 items-center justify-center rounded-full border ${
+                    selected
+                      ? "bg-[#8882e7] border-[#8882e7]"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-semibold ${
+                      selected ? "text-white" : "text-gray-600"
+                    }`}
+                  >
+                    {day}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Box>
+    );
+  };
+
   return (
     <>
       <Controller
@@ -278,16 +358,22 @@ const RepeatInput = React.memo(({ control }: { control: any; errors: any }) => {
         control={control}
         name="repeat"
         render={({ field: { value: repeatValue } }) =>
-          repeatValue === "daily" ? (
+          repeatValue === "monthly" ? (
             <Controller
               control={control}
               name="repeatValues"
               render={({ field: { onChange, value } }) => (
-                <RepeatValuesView repeatValues={value} onChange={onChange} />
+                <MonthDaysView repeatValues={value ?? []} onChange={onChange} />
               )}
             />
           ) : (
-            <></>
+            <Controller
+              control={control}
+              name="repeatValues"
+              render={({ field: { onChange, value } }) => (
+                <RepeatValuesView repeatValues={value ?? []} onChange={onChange} />
+              )}
+            />
           )
         }
       />
@@ -354,8 +440,9 @@ const Page = () => {
   const {
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
-  } = useForm({
+  } = useForm<TaskFormValues>({
     defaultValues: {
       name: routineTask ? routineTask.label : "",
       color: routineTask ? routineTask.color : "",
@@ -429,7 +516,7 @@ const Page = () => {
           />
           <IconInput control={control} errors={errors} />
           <ColorInput control={control} errors={errors} />
-          <RepeatInput control={control} errors={errors} />
+          <RepeatInput control={control} setValue={setValue} />
           <DoItAtInput control={control} errors={errors} />
 
           <Button

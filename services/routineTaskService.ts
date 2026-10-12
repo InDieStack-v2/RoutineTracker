@@ -6,10 +6,13 @@ import {
   localDateToUTCRange,
   toLocalDateString,
   utcToLocalDateString,
+  WEEKDAY_KEYS,
+  weekdayKey,
 } from "@/utils/dateUtils";
 
 export interface UserRoutineTask extends RoutineTask {
   isDone: boolean;
+  isHidden: boolean;
 }
 
 export type RoutineTaskSummary = {
@@ -19,34 +22,100 @@ export type RoutineTaskSummary = {
   color: string | null;
 };
 
+const WEEKDAY_SET = new Set<string>(WEEKDAY_KEYS);
+
+// daily: weekdays in repeatValues ("on these days"). Missing values = every day.
+// weekly: weekdays in repeatValues, else the weekday of createdAt.
+// monthly: day-of-month numbers in repeatValues, else the day of createdAt.
+// A selected day past the month's length lands on the last day.
+export function isTaskScheduledOn(task: RoutineTask, onDate: Date): boolean {
+  const repeat = task.repeat ?? "daily";
+  if (repeat === "weekly") return matchesWeekly(task, onDate);
+  if (repeat === "monthly") return matchesMonthly(task, onDate);
+  return matchesOnTheseDays(task, onDate);
+}
+
+function matchesOnTheseDays(task: RoutineTask, onDate: Date): boolean {
+  if (task.repeatValues == null) return true;
+  return weekdayValues(task.repeatValues).includes(weekdayKey(onDate));
+}
+
+function matchesWeekly(task: RoutineTask, onDate: Date): boolean {
+  if (task.repeatValues == null) {
+    return task.createdAt == null || weekdayKey(task.createdAt) === weekdayKey(onDate);
+  }
+  return weekdayValues(task.repeatValues).includes(weekdayKey(onDate));
+}
+
+function matchesMonthly(task: RoutineTask, onDate: Date): boolean {
+  if (task.repeatValues == null) {
+    return task.createdAt == null || matchesMonthDay(task.createdAt.getDate(), onDate);
+  }
+  return monthDayValues(task.repeatValues).some((day) => matchesMonthDay(day, onDate));
+}
+
+function weekdayValues(values: string[]): string[] {
+  return values.filter((value) => WEEKDAY_SET.has(value));
+}
+
+function monthDayValues(values: string[]): number[] {
+  const days: number[] = [];
+  for (const value of values) {
+    if (!/^\d+$/.test(value)) continue;
+    const day = Number(value);
+    if (day >= 1 && day <= 31) days.push(day);
+  }
+  return days;
+}
+
+function matchesMonthDay(day: number, onDate: Date): boolean {
+  const date = onDate.getDate();
+  if (date === day) return true;
+  const lastDay = new Date(onDate.getFullYear(), onDate.getMonth() + 1, 0).getDate();
+  return date === lastDay && day > lastDay;
+}
+
+function localDayTime(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function isLiveOnDate(task: RoutineTask, onDate: Date | null): boolean {
+  if (task.deletedAt != null) {
+    if (onDate == null || new Date(task.deletedAt).getTime() < new Date(onDate).getTime()) {
+      return false;
+    }
+  }
+  if (onDate == null) return true;
+  if (task.createdAt != null && localDayTime(task.createdAt) > localDayTime(onDate)) {
+    return false;
+  }
+  if (task.endDate != null && localDayTime(task.endDate) < localDayTime(onDate)) {
+    return false;
+  }
+  return true;
+}
+
 export class RoutineTaskService {
   public static async getFilteredRoutineTasks(
     routineTasks: RoutineTask[],
     onDate: Date | null = null,
+    options?: { includeHidden?: boolean },
   ): Promise<UserRoutineTask[]> {
     log.info("[RoutineTaskService] Filtering routine tasks", {
       routineTasks,
       onDate,
     });
     const finishedRoutineTaskIds = await this.getFinishedRoutineTasks(onDate);
+    const includeHidden = options?.includeHidden === true;
 
-    let filteredRoutineTasks = routineTasks
-      .filter((task) => {
-        if (task.deletedAt === null || task.deletedAt === undefined) {
-          return true;
-        }
-        if (onDate !== null && new Date(task.deletedAt) >= new Date(onDate)) {
-          return true;
-        }
-
-        return false;
-      })
+    return routineTasks
+      .filter((task) => isLiveOnDate(task, onDate))
       .map((task) => ({
         ...task,
         isDone: finishedRoutineTaskIds.includes(task.id),
-      }));
-
-    return filteredRoutineTasks;
+        isHidden: onDate != null && !isTaskScheduledOn(task, onDate),
+      }))
+      .filter((task) => includeHidden || !task.isHidden);
   }
 
   public static async markFinishedRoutineTask(

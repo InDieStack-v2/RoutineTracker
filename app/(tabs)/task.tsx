@@ -5,8 +5,11 @@ import { useFocusEffect, useRouter, useScrollToTop } from "expo-router";
 import {
   ArrowRightIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
+  EyeOffIcon,
   PlusIcon,
   XIcon,
 } from "lucide-react-native";
@@ -38,6 +41,7 @@ type Task = {
   label: string;
   isFavorite: boolean;
   isDone?: boolean;
+  isHidden?: boolean;
   color?: string;
   icon?: string;
 };
@@ -50,19 +54,24 @@ interface ItemViewProps {
 }
 
 const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
+  const hidden = task.isHidden === true;
   return (
     <View
-      className="bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center"
+      className={`rounded-2xl p-4 border flex-row items-center ${
+        hidden ? "bg-gray-50 border-gray-300" : "bg-white border-gray-100"
+      }`}
       style={
-        Platform.OS === "web"
-          ? ({ boxShadow: "0 1px 3px rgba(17, 24, 39, 0.06)" } as ViewStyle)
-          : {
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 8,
-              elevation: 2,
-            }
+        hidden
+          ? { borderStyle: "dashed" }
+          : Platform.OS === "web"
+            ? ({ boxShadow: "0 1px 3px rgba(17, 24, 39, 0.06)" } as ViewStyle)
+            : {
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 8,
+                elevation: 2,
+              }
       }
     >
       <TouchableOpacity
@@ -76,30 +85,42 @@ const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
           className="h-12 w-12 rounded-full items-center justify-center mr-4 bg-gray-50 border border-gray-100"
           style={
             task.color
-              ? { backgroundColor: task.color + "20" } // 20 opacity hex
+              ? { backgroundColor: task.color + "20" }
               : {}
           }
         >
-          <Text style={{ fontSize: 24 }}>{task.icon || "📝"}</Text>
+          <Text style={{ fontSize: 24, opacity: hidden ? 0.55 : 1 }}>
+            {task.icon || "📝"}
+          </Text>
         </View>
 
         <View className="flex-1">
           <Text
             className={`text-base font-semibold ${
-              task.isDone ? "text-gray-400 line-through" : "text-gray-800"
+              hidden
+                ? "text-gray-500"
+                : task.isDone
+                  ? "text-gray-400 line-through"
+                  : "text-gray-800"
             }`}
             numberOfLines={1}
           >
             {task.label}
           </Text>
-          {task.isDone && (
+          {hidden ? (
+            <Text className="text-xs text-gray-400 mt-0.5">{i18n.t("hidden")}</Text>
+          ) : task.isDone ? (
             <Text className="text-xs text-gray-400 mt-0.5">
-              {i18n.t('completed')}
+              {i18n.t("completed")}
             </Text>
-          )}
+          ) : null}
         </View>
 
-        {task.isDone ? (
+        {hidden ? (
+          <View className="bg-gray-200 p-1.5 rounded-full">
+            <Icon as={EyeOffIcon} className="text-gray-500" size="sm" />
+          </View>
+        ) : task.isDone ? (
           <View className="bg-green-100 p-1.5 rounded-full">
             <Icon as={CheckIcon} className="text-green-600" size="sm" />
           </View>
@@ -187,47 +208,51 @@ const RoutineTask = React.memo(
     ) => {
       return (
         <View className="mx-4 mb-3">
-          <Swipeable
-            ref={ref}
-            overshootLeft={false}
-            overshootRight={false}
-            friction={2}
-            useNativeAnimations={Platform.OS !== "web"}
-            renderLeftActions={() => (
-              <SwipeAction
-                side="left"
-                color={task.isDone ? "#ef4444" : "#8882e7"}
-                icon={task.isDone ? XIcon : CheckIcon}
-                label={i18n.t(task.isDone ? "mark_undo" : "mark_done")}
-              />
-            )}
-            renderRightActions={
-              task.isDone
-                ? undefined
-                : () => (
-                    <SwipeAction
-                      side="right"
-                      color="#6b7280"
-                      icon={ArrowRightIcon}
-                      label={i18n.t("skip")}
-                    />
-                  )
-            }
-            onSwipeableWillOpen={onSwipeableWillOpen}
-            onSwipeableOpen={(direction) => {
-              closeSwipeable(ref);
-              if (direction === "left") {
-                onToggle(task.id);
-              } else {
-                onDelete?.(task.id);
-              }
-            }}
-            onSwipeableClose={() => {
-              onClose();
-            }}
-          >
+          {task.isHidden ? (
             <ItemView task={task} onItemPress={onItemPress} />
-          </Swipeable>
+          ) : (
+            <Swipeable
+              ref={ref}
+              overshootLeft={false}
+              overshootRight={false}
+              friction={2}
+              useNativeAnimations={Platform.OS !== "web"}
+              renderLeftActions={() => (
+                <SwipeAction
+                  side="left"
+                  color={task.isDone ? "#ef4444" : "#8882e7"}
+                  icon={task.isDone ? XIcon : CheckIcon}
+                  label={i18n.t(task.isDone ? "mark_undo" : "mark_done")}
+                />
+              )}
+              renderRightActions={
+                task.isDone
+                  ? undefined
+                  : () => (
+                      <SwipeAction
+                        side="right"
+                        color="#6b7280"
+                        icon={ArrowRightIcon}
+                        label={i18n.t("skip")}
+                      />
+                    )
+              }
+              onSwipeableWillOpen={onSwipeableWillOpen}
+              onSwipeableOpen={(direction) => {
+                closeSwipeable(ref);
+                if (direction === "left") {
+                  onToggle(task.id);
+                } else {
+                  onDelete?.(task.id);
+                }
+              }}
+              onSwipeableClose={() => {
+                onClose();
+              }}
+            >
+              <ItemView task={task} onItemPress={onItemPress} />
+            </Swipeable>
+          )}
         </View>
       );
     },
@@ -479,6 +504,7 @@ export default function TaskScreen() {
   const swipeableRefs = useRef<Map<string, Swipeable | null>>(new Map());
   const sectionListRef = useRef<SectionList<Task>>(null);
   const [filteredOnDate, setFilteredOnDate] = useState<Date | null>(new Date());
+  const [showAll, setShowAll] = useState(false);
   const router = useRouter();
   const tabOverflow = useBottomTabOverflow();
   const fabBottom = tabOverflow + FAB_GAP;
@@ -507,10 +533,9 @@ export default function TaskScreen() {
   useScrollToTop(sectionListRef as any);
 
   useEffect(() => {
-    RoutineTaskService.getFilteredRoutineTasks(
-      routineTasks,
-      filteredOnDate,
-    ).then((filteredTasks) => {
+    RoutineTaskService.getFilteredRoutineTasks(routineTasks, filteredOnDate, {
+      includeHidden: true,
+    }).then((filteredTasks) => {
       setTasks(
         filteredTasks.map((task) => {
           return {
@@ -518,6 +543,7 @@ export default function TaskScreen() {
             label: task.label,
             isFavorite: task.isFavorite,
             isDone: task.isDone || false,
+            isHidden: task.isHidden,
             color: task.color,
             icon: task.icon,
           };
@@ -546,9 +572,10 @@ export default function TaskScreen() {
       }
 
       const selectedStr = toLocalDateString(filteredOnDate || new Date());
+      const scheduled = tasks.filter((item) => !item.isHidden);
       const remainingDoneCount = task.isDone
-        ? tasks.filter((t) => t.isDone && t.id !== taskId).length
-        : tasks.filter((t) => t.isDone).length + 1;
+        ? scheduled.filter((item) => item.isDone && item.id !== taskId).length
+        : scheduled.filter((item) => item.isDone).length + 1;
 
       if (remainingDoneCount > 0) {
         await useStreakStore.getState().recordTaskDone(selectedStr);
@@ -618,32 +645,71 @@ export default function TaskScreen() {
     [handleToggleFavorite, handleToggleTask, handleItemPressed],
   );
 
-  const todoTasks = tasks.filter((task) => !task.isDone);
-  const doneTasks = tasks.filter((task) => task.isDone);
+  const todoTasks = tasks.filter((task) => !task.isHidden && !task.isDone);
+  const doneTasks = tasks.filter((task) => !task.isHidden && task.isDone);
+  const hiddenCount = tasks.filter((task) => task.isHidden).length;
+  const hiddenTasks = showAll ? tasks.filter((task) => task.isHidden) : [];
+  const sections = [
+    { title: i18n.t("todo"), kind: "todo" as const, data: todoTasks },
+    { title: i18n.t("completed"), kind: "done" as const, data: doneTasks },
+    ...(hiddenCount > 0
+      ? [{ title: i18n.t("hidden"), kind: "hidden" as const, data: hiddenTasks }]
+      : []),
+  ].filter((section) => section.kind === "hidden" || section.data.length > 0);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View className="flex-1 bg-gray-50/50 pt-4">
         <SectionList
           ref={sectionListRef}
-          sections={[
-            { title: i18n.t('todo'), data: todoTasks },
-            { title: i18n.t('completed'), data: doneTasks },
-          ]}
+          sections={sections}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          renderSectionHeader={({ section: { title, data } }) => {
-            if (title === i18n.t('completed') && data.length > 0) {
+          renderSectionHeader={({ section }) => {
+            if (section.kind === "hidden") {
               return (
-                <View className="flex-row items-center px-6 py-4 mt-2 mb-2">
-                  <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                    {i18n.t('completed')} ({data.length})
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showAll }}
+                  onPress={() => setShowAll((open) => !open)}
+                  className="mx-4 mt-2 mb-3 flex-row items-center rounded-2xl border bg-white px-4 py-3"
+                  style={{
+                    borderColor: showAll ? "#8882e7" : "#f3f4f6",
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 8,
+                    elevation: 2,
+                  }}
+                >
+                  <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-gray-100">
+                    <Icon as={EyeOffIcon} size="sm" className="text-gray-500" />
+                  </View>
+                  <Text className="flex-1 text-sm font-semibold text-gray-800">
+                    {i18n.t("show_all")}
                   </Text>
-                  <View className="h-[1px] flex-1 bg-gray-200 ml-4" />
-                </View>
+                  <Text className="mr-2 text-sm font-semibold text-gray-400">
+                    {hiddenCount}
+                  </Text>
+                  <Icon
+                    as={showAll ? ChevronUpIcon : ChevronDownIcon}
+                    size="sm"
+                    className="text-gray-400"
+                  />
+                </Pressable>
               );
             }
-            return null;
+            if (section.kind === "todo" || section.data.length === 0) {
+              return null;
+            }
+            return (
+              <View className="flex-row items-center px-6 py-4 mt-2 mb-2">
+                <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                  {i18n.t("completed")} ({section.data.length})
+                </Text>
+                <View className="h-[1px] flex-1 bg-gray-200 ml-4" />
+              </View>
+            );
           }}
           ListHeaderComponent={
             <FilterTask
@@ -655,7 +721,7 @@ export default function TaskScreen() {
             <View className="flex-1 items-center justify-center py-20 px-8">
               <Text style={{ fontSize: 48 }}>📋</Text>
               <Text className="text-gray-400 text-base font-semibold mt-4 text-center">
-                No tasks for this day
+                {i18n.t("no_tasks_for_day")}
               </Text>
             </View>
           )}

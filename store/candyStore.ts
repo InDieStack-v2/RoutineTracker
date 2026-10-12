@@ -9,7 +9,7 @@ export interface RoutineTask {
     icon?: string;
     doItAt?: 'morning' | 'afternoon' | 'evening'; // Time in HH:mm format
     repeat?: 'daily' | 'weekly' | 'monthly';
-    repeatValues?: string[]; // e.g., ['Mon', 'Wed', 'Fri'] for weekly
+    repeatValues?: string[]; // weekdays ('Mon') for daily/weekly; day-of-month ('15') for monthly
     endDate?: Date | null;
 
     createdAt?: Date;

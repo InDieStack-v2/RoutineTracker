@@ -48,6 +48,9 @@ export default {
   skip: "Skip",
   mark_done: "Done",
   mark_undo: "Undo",
+  show_all: "Show all",
+  hidden: "Hidden",
+  no_tasks_for_day: "No tasks for this day",
   routine_tasks: "Routine Tasks",
 
   // Task Form

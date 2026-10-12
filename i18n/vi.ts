@@ -48,6 +48,9 @@ export default {
   skip: "Bỏ qua",
   mark_done: "Xong",
   mark_undo: "Hoàn tác",
+  show_all: "Hiện tất cả",
+  hidden: "Ẩn",
+  no_tasks_for_day: "Không có công việc trong ngày này",
   routine_tasks: "Công việc thường ngày",
 
   // Task Form

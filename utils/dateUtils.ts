@@ -41,3 +41,9 @@ export function datesInMonth(year: number, monthIndex: number): Date[] {
   const count = new Date(year, monthIndex + 1, 0).getDate();
   return Array.from({ length: count }, (_, day) => new Date(year, monthIndex, day + 1));
 }
+
+export const WEEKDAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+export function weekdayKey(date: Date): (typeof WEEKDAY_KEYS)[number] {
+  return WEEKDAY_KEYS[date.getDay()];
+}
