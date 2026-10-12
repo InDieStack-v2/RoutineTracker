@@ -1,5 +1,4 @@
 // services/streakService.ts
-import { toLocalDateString } from '@/utils/dateUtils';
 
 export const FREEZE_CAP = 3;
 export const FREEZE_AWARD_INTERVAL = 7;
@@ -44,7 +43,11 @@ export function getYesterday(dateStr: string): string {
 
 function shiftDate(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split('-').map(Number);
-  return toLocalDateString(new Date(year, month - 1, day + days));
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function streakStartDate(lastTaskDate: string, streakCount: number): string {

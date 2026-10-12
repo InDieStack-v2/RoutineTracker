@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getDB, type SQLiteDatabase } from '@/services/db';
-import { utcToLocalDateString, localDateToUTCRange, toLocalDateString } from '@/utils/dateUtils';
+import { utcToLocalDateString, localDateToUTCRange, toLocalDateString, todayLocalDateString } from '@/utils/dateUtils';
+import { getActiveTimeZone, isSystemTimeZone, noonOnCalendarDate, shiftCalendarDate, weekdayOfCalendarDate } from '@/utils/timezone';
 
 export type MoodType = 'Great' | 'Good' | 'Okay' | 'Not Good' | 'Bad';
 
@@ -97,21 +98,23 @@ function loggedAtForMoodDate(dateStr: string): string {
     if (dateStr === toLocalDateString(new Date())) {
         return new Date().toISOString();
     }
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day, 12, 0, 0, 0).toISOString();
+    if (isSystemTimeZone(getActiveTimeZone())) {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day, 12, 0, 0, 0).toISOString();
+    }
+    return noonOnCalendarDate(dateStr).toISOString();
 }
 
 const LAST_WEEK_SAMPLE = [1, 0, 2, 3, 1, 4, 2];
 
 async function seedLastWeekMoods(db: SQLiteDatabase): Promise<void> {
-    const today = new Date();
-    const weekday = today.getDay();
+    const today = todayLocalDateString();
+    const weekday = weekdayOfCalendarDate(today);
     const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
-    const thisMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + mondayOffset);
+    const thisMonday = shiftCalendarDate(today, mondayOffset);
 
     for (let i = 0; i < LAST_WEEK_SAMPLE.length; i++) {
-        const date = new Date(thisMonday.getFullYear(), thisMonday.getMonth(), thisMonday.getDate() - 7 + i);
-        const dateStr = toLocalDateString(date);
+        const dateStr = shiftCalendarDate(thisMonday, -7 + i);
         const { start, end } = localDateToUTCRange(dateStr);
         const existing = await db.getFirstAsync<{ logged_at: string }>(
             'SELECT logged_at FROM mood_logs WHERE logged_at >= ? AND logged_at < ?',

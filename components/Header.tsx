@@ -8,6 +8,7 @@ import { FlameIcon, SnowflakeIcon } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useStreakStore } from '@/store/streakStore';
+import { formatInstant } from '@/utils/dateUtils';
 
 const LOCALE_MAP: Record<string, string> = {
   en: 'en-US',
@@ -20,10 +21,16 @@ interface HeaderProps {
 
 export const Header = ({ title }: HeaderProps) => {
   const language = useSettingsStore((state) => state.language);
+  const timezone = useSettingsStore((state) => state.timezone);
   const streakCount = useStreakStore((state) => state.streakCount);
   const freezeCount = useStreakStore((state) => state.freezeCount);
   const locale = LOCALE_MAP[language] ?? 'en-US';
-  const date = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' });
+  const date = formatInstant(
+    new Date(),
+    locale,
+    { weekday: 'long', day: 'numeric', month: 'short' },
+    timezone,
+  );
 
   return (
     <Box className="bg-white">

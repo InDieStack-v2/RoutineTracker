@@ -15,7 +15,7 @@ import { useForm, Controller, type Control, type UseFormSetValue } from "react-h
 import { Grid, GridItem } from "@/components/ui/grid";
 import { useCandyContext } from "@/store/context";
 import i18n from "@/i18n";
-import { WEEKDAY_KEYS } from "@/utils/dateUtils";
+import { WEEKDAY_KEYS, currentCalendar } from "@/utils/dateUtils";
 
 const COLORS = [
   "#FFFFCD",
@@ -190,11 +190,11 @@ const RepeatInput = React.memo(({
               onPress={() => {
                 if (option === repeatType) return;
                 onChange(option);
-                const today = new Date();
+                const today = currentCalendar();
                 if (option === "weekly") {
-                  setValue("repeatValues", [WEEKDAY_KEYS[today.getDay()]]);
+                  setValue("repeatValues", [WEEKDAY_KEYS[today.weekday]]);
                 } else if (option === "monthly") {
-                  setValue("repeatValues", [String(today.getDate())]);
+                  setValue("repeatValues", [String(today.day)]);
                 } else {
                   setValue("repeatValues", [...WEEKDAY_KEYS]);
                 }

@@ -9,6 +9,7 @@ import {
   WEEKDAY_KEYS,
   weekdayKey,
 } from "@/utils/dateUtils";
+import { daysInCalendarMonth, getActiveTimeZone, isSystemTimeZone, noonOnCalendarDate, zonedParts } from "@/utils/timezone";
 
 export interface UserRoutineTask extends RoutineTask {
   isDone: boolean;
@@ -49,7 +50,7 @@ function matchesWeekly(task: RoutineTask, onDate: Date): boolean {
 
 function matchesMonthly(task: RoutineTask, onDate: Date): boolean {
   if (task.repeatValues == null) {
-    return task.createdAt == null || matchesMonthDay(task.createdAt.getDate(), onDate);
+    return task.createdAt == null || matchesMonthDay(dayOfMonth(task.createdAt), onDate);
   }
   return monthDayValues(task.repeatValues).some((day) => matchesMonthDay(day, onDate));
 }
@@ -68,15 +69,37 @@ function monthDayValues(values: string[]): number[] {
   return days;
 }
 
+function dayOfMonth(date: Date): number {
+  if (isSystemTimeZone(getActiveTimeZone())) return date.getDate();
+  return zonedParts(date).day;
+}
+
 function matchesMonthDay(day: number, onDate: Date): boolean {
-  const date = onDate.getDate();
-  if (date === day) return true;
-  const lastDay = new Date(onDate.getFullYear(), onDate.getMonth() + 1, 0).getDate();
-  return date === lastDay && day > lastDay;
+  if (isSystemTimeZone(getActiveTimeZone())) {
+    const date = onDate.getDate();
+    if (date === day) return true;
+    const lastDay = new Date(onDate.getFullYear(), onDate.getMonth() + 1, 0).getDate();
+    return date === lastDay && day > lastDay;
+  }
+  const parts = zonedParts(onDate);
+  if (parts.day === day) return true;
+  const lastDay = daysInCalendarMonth(parts.year, parts.month - 1);
+  return parts.day === lastDay && day > lastDay;
 }
 
 function localDayTime(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function compareCivilDays(a: Date, b: Date): number {
+  if (isSystemTimeZone(getActiveTimeZone())) {
+    return localDayTime(a) - localDayTime(b);
+  }
+  const aDay = toLocalDateString(a);
+  const bDay = toLocalDateString(b);
+  if (aDay < bDay) return -1;
+  if (aDay > bDay) return 1;
+  return 0;
 }
 
 function isLiveOnDate(task: RoutineTask, onDate: Date | null): boolean {
@@ -86,10 +109,10 @@ function isLiveOnDate(task: RoutineTask, onDate: Date | null): boolean {
     }
   }
   if (onDate == null) return true;
-  if (task.createdAt != null && localDayTime(task.createdAt) > localDayTime(onDate)) {
+  if (task.createdAt != null && compareCivilDays(task.createdAt, onDate) > 0) {
     return false;
   }
-  if (task.endDate != null && localDayTime(task.endDate) < localDayTime(onDate)) {
+  if (task.endDate != null && compareCivilDays(task.endDate, onDate) < 0) {
     return false;
   }
   return true;
@@ -353,6 +376,9 @@ function completionInstantForLocalDate(onDate: Date): string {
   if (localDateStr === toLocalDateString(new Date())) {
     return new Date().toISOString();
   }
-  const [year, month, day] = localDateStr.split("-").map(Number);
-  return new Date(year, month - 1, day, 12, 0, 0, 0).toISOString();
+  if (isSystemTimeZone(getActiveTimeZone())) {
+    const [year, month, day] = localDateStr.split("-").map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0, 0).toISOString();
+  }
+  return noonOnCalendarDate(localDateStr).toISOString();
 }

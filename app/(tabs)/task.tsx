@@ -1,6 +1,7 @@
 import { RoutineTaskService } from "@/services/routineTaskService";
 import { useCandyContext } from "@/store/context";
 import { useStreakStore } from "@/store/streakStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { useFocusEffect, useRouter, useScrollToTop } from "expo-router";
 import {
   ArrowRightIcon,
@@ -34,7 +35,7 @@ import { Icon } from "@/components/ui/icon";
 import { Fab } from "@/components/ui/fab";
 import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import i18n from "@/i18n";
-import { toLocalDateString } from "@/utils/dateUtils";
+import { calendarDateString, noonOnCalendarDate, shiftCalendarDate, toLocalDateString, todayLocalDateString } from "@/utils/dateUtils";
 
 type Task = {
   id: string;
@@ -272,16 +273,17 @@ function DatePopup({
   onClose: () => void;
   onSelect: (date: Date) => void;
 }) {
+  const selectedKey = toLocalDateString(value);
+  const [selectedYear, selectedMonth] = selectedKey.split("-").map(Number);
   const [cursor, setCursor] = useState(
-    () => new Date(value.getFullYear(), value.getMonth(), 1),
+    () => new Date(selectedYear, selectedMonth - 1, 1),
   );
   const locale = i18n.locale === "vi" ? "vi-VN" : "en-US";
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
-  const selectedKey = toLocalDateString(value);
-  const todayKey = toLocalDateString(new Date());
+  const todayKey = todayLocalDateString();
   const labels = [
     i18n.t("mon"),
     i18n.t("tue"),
@@ -361,15 +363,14 @@ function DatePopup({
             ))}
             {Array.from({ length: daysInMonth }, (_, index) => {
               const day = index + 1;
-              const date = new Date(year, month, day);
-              const key = toLocalDateString(date);
+              const key = calendarDateString(year, month, day);
               const selected = key === selectedKey;
               const today = key === todayKey;
               return (
                 <Pressable
                   key={key}
                   accessibilityRole="button"
-                  onPress={() => onSelect(date)}
+                  onPress={() => onSelect(noonOnCalendarDate(key))}
                   className="items-center justify-center"
                   style={{ width: "14.28%", height: 40 }}
                 >
@@ -435,8 +436,7 @@ const FilterTask: React.FC<FilterTaskProps> = React.memo(
           setSelectedType('today');
           onSelectedDateChange(new Date());
         } else if (index === 1) {
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterday = noonOnCalendarDate(shiftCalendarDate(todayLocalDateString(), -1));
           setSelectedType('yesterday');
           onSelectedDateChange(yesterday);
         } else {
@@ -510,6 +510,7 @@ export default function TaskScreen() {
   const fabBottom = tabOverflow + FAB_GAP;
 
   const routineTasks = useCandyContext((state) => state.routineTasks);
+  const timezone = useSettingsStore((state) => state.timezone);
   const updateRoutineTask = useCandyContext((state) => state.updateRoutineTask);
 
   // Sub-step A: Cleanup stale refs when tasks change
@@ -550,7 +551,7 @@ export default function TaskScreen() {
         }),
       );
     });
-  }, [routineTasks, filteredOnDate]);
+  }, [routineTasks, filteredOnDate, timezone]);
 
   const handleToggleTask = React.useCallback(
     async (taskId: string) => {

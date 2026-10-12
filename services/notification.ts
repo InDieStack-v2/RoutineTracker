@@ -1,9 +1,15 @@
 import * as Notifications from 'expo-notifications';
-import { SchedulableTriggerInputTypes } from 'expo-notifications';
+import { SchedulableTriggerInputTypes, type NotificationTriggerInput } from 'expo-notifications';
 import { Platform } from 'react-native';
 import { candyStore } from '../store/candyStore';
 import { RoutineTaskService } from './routineTaskService';
 import log from './logger';
+import {
+  deviceLocalWallClock,
+  getActiveTimeZone,
+  isSystemTimeZone,
+  resolveTimeZone,
+} from '@/utils/timezone';
 
 export const setupNotificationHandler = async () => {
   if (Platform.OS === "web") {
@@ -95,14 +101,36 @@ export const scheduleNotificationsForRoutineTasks = async () => {
           categoryIdentifier: 'routine-task-actions',
         },
         // trigger: { type: SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 10, repeats: true },
-        trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: reminderTime?.getHours() ?? 8, minute: reminderTime?.getMinutes() ?? 0 },
+        trigger: reminderTrigger(reminderTime?.getHours() ?? 8, reminderTime?.getMinutes() ?? 0),
       });
-      log.info(`Notification scheduled for task: ${task.label} at ${reminderTime?.getHours()}:${reminderTime?.getMinutes()}`);
+      log.info(`Notification scheduled for task: ${task.label} at ${reminderTime?.getHours() ?? 8}:${reminderTime?.getMinutes() ?? 0} (${getActiveTimeZone()})`);
     } catch (error) {
       log.error(`Failed to schedule notification for task: ${task.label}`, error);
     }
   }
 };
+
+function reminderTrigger(hour: number, minute: number): NotificationTriggerInput {
+  const timeZone = getActiveTimeZone();
+  // iOS calendar triggers honor an IANA zone. Android daily triggers are device-local,
+  // so a custom zone is converted to the current device clock and refreshed on launch.
+  if (!isSystemTimeZone(timeZone) && Platform.OS === 'ios') {
+    return {
+      type: SchedulableTriggerInputTypes.CALENDAR,
+      hour,
+      minute,
+      repeats: true,
+      timezone: resolveTimeZone(timeZone),
+    };
+  }
+
+  const wall = deviceLocalWallClock(hour, minute, timeZone);
+  return {
+    type: SchedulableTriggerInputTypes.DAILY,
+    hour: wall.hour,
+    minute: wall.minute,
+  };
+}
 
 export async function registerForPushNotificationsAsync() {
   let token;

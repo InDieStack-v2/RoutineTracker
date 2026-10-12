@@ -1,49 +1,105 @@
-// Convert a Date object to a local YYYY-MM-DD string using device timezone
-export function toLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+import {
+  calendarDateString,
+  daysInCalendarMonth,
+  getActiveTimeZone,
+  isSystemTimeZone,
+  midnightOnCalendarDate,
+  shiftCalendarDate,
+  weekdayOfCalendarDate,
+  zonedDateString,
+  zonedParts,
+  calendarDateUtcRange,
+} from "./timezone";
+
+export {
+  calendarDateString,
+  formatCalendarDate,
+  formatInstant,
+  noonOnCalendarDate,
+  shiftCalendarDate,
+} from "./timezone";
+
+function activeZone(timeZone?: string): string {
+  return timeZone ?? getActiveTimeZone();
 }
 
-// Return today's date as a local YYYY-MM-DD string
-export function todayLocalDateString(): string {
-  return toLocalDateString(new Date());
+// Calendar dates follow the active timezone. "system" keeps device-local Date methods.
+export function toLocalDateString(date: Date, timeZone?: string): string {
+  if (isSystemTimeZone(activeZone(timeZone))) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  return zonedDateString(date, activeZone(timeZone));
 }
 
-// Convert a local YYYY-MM-DD string to a UTC ISO range [start, end) covering that entire local day
+export function todayLocalDateString(timeZone?: string): string {
+  return toLocalDateString(new Date(), timeZone);
+}
+
 export function localDateToUTCRange(localDateStr: string): { start: string; end: string } {
-  const [year, month, day] = localDateStr.split('-').map(Number);
-  const start = new Date(year, month - 1, day).toISOString();
-  const end = new Date(year, month - 1, day + 1).toISOString();
-  return { start, end };
+  if (isSystemTimeZone(getActiveTimeZone())) {
+    const [year, month, day] = localDateStr.split("-").map(Number);
+    const start = new Date(year, month - 1, day).toISOString();
+    const end = new Date(year, month - 1, day + 1).toISOString();
+    return { start, end };
+  }
+  return calendarDateUtcRange(localDateStr);
 }
 
-// Convert a UTC ISO string to a local YYYY-MM-DD string
 export function utcToLocalDateString(isoUtc: string): string {
   return toLocalDateString(new Date(isoUtc));
 }
 
-// Local calendar day `days` away from `date`, at local midnight.
-export function addLocalDays(date: Date, days: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+export function addLocalDays(date: Date, days: number, timeZone?: string): Date {
+  const zone = activeZone(timeZone);
+  if (isSystemTimeZone(zone)) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+  }
+  return midnightOnCalendarDate(shiftCalendarDate(zonedDateString(date, zone), days), zone);
 }
 
-// Monday 00:00 local of the week that contains `date`. Sunday closes that week.
-export function startOfWeekMonday(date: Date): Date {
-  const day = date.getDay();
+export function startOfWeekMonday(date: Date, timeZone?: string): Date {
+  const zone = activeZone(timeZone);
+  if (isSystemTimeZone(zone)) {
+    const day = date.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    return addLocalDays(date, mondayOffset, zone);
+  }
+  const dateStr = zonedDateString(date, zone);
+  const day = weekdayOfCalendarDate(dateStr);
   const mondayOffset = day === 0 ? -6 : 1 - day;
-  return addLocalDays(date, mondayOffset);
+  return midnightOnCalendarDate(shiftCalendarDate(dateStr, mondayOffset), zone);
 }
 
-// Every local midnight in `monthIndex` (0-11). Does not spill into the next month.
-export function datesInMonth(year: number, monthIndex: number): Date[] {
-  const count = new Date(year, monthIndex + 1, 0).getDate();
-  return Array.from({ length: count }, (_, day) => new Date(year, monthIndex, day + 1));
+export function datesInMonth(year: number, monthIndex: number, timeZone?: string): Date[] {
+  const zone = activeZone(timeZone);
+  if (isSystemTimeZone(zone)) {
+    const count = new Date(year, monthIndex + 1, 0).getDate();
+    return Array.from({ length: count }, (_, day) => new Date(year, monthIndex, day + 1));
+  }
+  const count = daysInCalendarMonth(year, monthIndex);
+  return Array.from({ length: count }, (_, day) =>
+    midnightOnCalendarDate(calendarDateString(year, monthIndex, day + 1), zone),
+  );
+}
+
+export function currentCalendar(timeZone?: string): { year: number; month: number; day: number; weekday: number } {
+  const parts = zonedParts(new Date(), activeZone(timeZone));
+  return {
+    year: parts.year,
+    month: parts.month - 1,
+    day: parts.day,
+    weekday: parts.weekday,
+  };
 }
 
 export const WEEKDAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export function weekdayKey(date: Date): (typeof WEEKDAY_KEYS)[number] {
-  return WEEKDAY_KEYS[date.getDay()];
+  if (isSystemTimeZone(getActiveTimeZone())) {
+    return WEEKDAY_KEYS[date.getDay()];
+  }
+  return WEEKDAY_KEYS[zonedParts(date).weekday];
 }

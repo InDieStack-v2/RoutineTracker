@@ -14,14 +14,17 @@ import { useMoodStore } from "@/store/moodStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import {
   addLocalDays,
+  currentCalendar,
   datesInMonth,
+  formatCalendarDate,
   startOfWeekMonday,
   todayLocalDateString,
   toLocalDateString,
 } from "@/utils/dateUtils";
+import { isSystemTimeZone } from "@/utils/timezone";
 import { useFocusEffect, useScrollToTop } from "expo-router";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react-native";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Modal,
   Platform,
@@ -89,9 +92,24 @@ function monthLabel(year: number, month: number, language: string): string {
   });
 }
 
-function weekRangeLabel(start: Date, language: string): string {
-  const end = addLocalDays(start, 6);
+function weekRangeLabel(start: Date, language: string, timeZone: string): string {
+  const end = addLocalDays(start, 6, timeZone);
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  if (!isSystemTimeZone(timeZone)) {
+    const startStr = toLocalDateString(start, timeZone);
+    const endStr = toLocalDateString(end, timeZone);
+    const [startYear, startMonth] = startStr.split("-").map(Number);
+    const [endYear, endMonth] = endStr.split("-").map(Number);
+    const sameMonth = startYear === endYear && startMonth === endMonth;
+    const includeYear = endYear !== currentCalendar(timeZone).year;
+    const startText = formatCalendarDate(startStr, locale, { month: "short", day: "numeric" });
+    const endText = formatCalendarDate(endStr, locale, {
+      day: "numeric",
+      ...(sameMonth ? {} : { month: "short" }),
+      ...(includeYear ? { year: "numeric" } : {}),
+    });
+    return `${startText} – ${endText}`;
+  }
   const sameMonth =
     start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
   const includeYear = end.getFullYear() !== new Date().getFullYear();
@@ -158,6 +176,7 @@ function Board({
 
 function WeeklyChart() {
   const language = useSettingsStore((state) => state.language);
+  const timezone = useSettingsStore((state) => state.timezone);
   const [weekOffset, setWeekOffset] = useState(0);
   const [counts, setCounts] = useState<WeekCount[]>([]);
   const [ready, setReady] = useState(false);
@@ -166,20 +185,20 @@ function WeeklyChart() {
   const requestId = useRef(0);
 
   const labels = weekLabels();
-  const today = todayLocalDateString();
-  const weekStart = addLocalDays(startOfWeekMonday(new Date()), weekOffset * 7);
+  const today = todayLocalDateString(timezone);
+  const weekStart = addLocalDays(startOfWeekMonday(new Date(), timezone), weekOffset * 7, timezone);
   const isCurrentWeek = weekOffset === 0;
 
   const loadWeek = useCallback(async (offset: number) => {
     const id = ++requestId.current;
     try {
-      const start = addLocalDays(startOfWeekMonday(new Date()), offset * 7);
-      const dates = Array.from({ length: 7 }, (_, index) => addLocalDays(start, index));
+      const start = addLocalDays(startOfWeekMonday(new Date(), timezone), offset * 7, timezone);
+      const dates = Array.from({ length: 7 }, (_, index) => addLocalDays(start, index, timezone));
       const results = await RoutineTaskService.getFinishedRoutineTasksForDates(dates);
       if (id !== requestId.current) return;
       setCounts(
         dates.map((date, index) => ({
-          date: toLocalDateString(date),
+          date: toLocalDateString(date, timezone),
           value: results[index]?.length ?? 0,
         })),
       );
@@ -187,7 +206,7 @@ function WeeklyChart() {
     } catch (error) {
       log.error("[HomeScreen] Failed to load weekly tasks", { error });
     }
-  }, []);
+  }, [timezone]);
 
   useFocusEffect(
     useCallback(() => {
@@ -227,7 +246,7 @@ function WeeklyChart() {
       }
     >
       <WeekSwitch
-        label={isCurrentWeek ? i18n.t("this_week") : weekRangeLabel(weekStart, language)}
+        label={isCurrentWeek ? i18n.t("this_week") : weekRangeLabel(weekStart, language, timezone)}
         canGoForward={weekOffset < 0}
         onShift={shiftWeek}
       />
@@ -402,7 +421,7 @@ function dayLabel(dateStr: string, language: string): string {
   return new Date(year, month - 1, day).toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
-    ...(year !== new Date().getFullYear() ? { year: "numeric" } : {}),
+    ...(year !== currentCalendar().year ? { year: "numeric" } : {}),
   });
 }
 
@@ -678,19 +697,20 @@ function DayTasksTooltip({
 
 function MonthlyCalendar() {
   const language = useSettingsStore((state) => state.language);
+  const timezone = useSettingsStore((state) => state.timezone);
   const routineTasks = useCandyContext((state) => state.routineTasks);
   const [visibleMonth, setVisibleMonth] = useState(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() };
+    const now = currentCalendar();
+    return { year: now.year, month: now.month };
   });
   const [marks, setMarks] = useState<Record<string, DayMark>>({});
   const [summaries, setSummaries] = useState<Record<string, RoutineTaskSummary>>({});
   const [anchor, setAnchor] = useState<DayAnchor | null>(null);
   const [cellWidth, setCellWidth] = useState(0);
   const labels = weekLabels();
-  const today = todayLocalDateString();
+  const today = todayLocalDateString(timezone);
   const { year, month } = visibleMonth;
-  const days = datesInMonth(year, month);
+  const days = datesInMonth(year, month, timezone);
   const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
   const ringSize =
     cellWidth > 0 ? Math.min(40, Math.max(24, Math.floor(cellWidth) - 8)) : 28;
@@ -701,14 +721,14 @@ function MonthlyCalendar() {
   const loadMonth = useCallback(async (nextYear: number, nextMonth: number) => {
     const id = ++requestId.current;
     try {
-      const dates = datesInMonth(nextYear, nextMonth);
+      const dates = datesInMonth(nextYear, nextMonth, timezone);
       const finished = await RoutineTaskService.getFinishedRoutineTasksForDates(dates);
       if (id !== requestId.current) return;
       const next: Record<string, DayMark> = {};
       dates.forEach((date, index) => {
         const taskIds = finished[index] ?? [];
         if (taskIds.length > 0) {
-          next[toLocalDateString(date)] = { taskIds };
+          next[toLocalDateString(date, timezone)] = { taskIds };
         }
       });
       setMarks(next);
@@ -722,7 +742,7 @@ function MonthlyCalendar() {
     } catch (error) {
       log.error("[HomeScreen] Failed to load calendar", { error });
     }
-  }, []);
+  }, [timezone]);
 
   const shiftMonth = (delta: number) => {
     const current = monthRef.current;
@@ -771,6 +791,18 @@ function MonthlyCalendar() {
       };
     }, [loadMonth]),
   );
+  const seenTimezone = useRef(timezone);
+  useEffect(() => {
+    if (seenTimezone.current === timezone) return;
+    seenTimezone.current = timezone;
+    const now = currentCalendar(timezone);
+    const next = { year: now.year, month: now.month };
+    monthRef.current = next;
+    setAnchor(null);
+    setVisibleMonth(next);
+    loadMonth(next.year, next.month);
+  }, [timezone, loadMonth]);
+
 
   const selectedTasks = anchor
     ? completedTasksFor(
@@ -818,7 +850,7 @@ function MonthlyCalendar() {
             <View key={`empty-${index}`} style={{ width: "14.28%", height: ringSize + 8 }} />
           ))}
           {days.map((date) => {
-            const dateStr = toLocalDateString(date);
+            const dateStr = toLocalDateString(date, timezone);
             const isToday = dateStr === today;
             const isFuture = dateStr > today;
             const selected = anchor?.date === dateStr;
@@ -866,7 +898,7 @@ function MonthlyCalendar() {
                   <ProgressCircle
                     size={ringSize}
                     progressPercent={percent}
-                    displayText={String(date.getDate())}
+                    displayText={String(Number(dateStr.slice(8)))}
                     textColor={
                       isFuture
                         ? "#d1d5db"
@@ -1045,15 +1077,16 @@ function MoodLine({
 
 function MoodChart() {
   const language = useSettingsStore((state) => state.language);
+  const timezone = useSettingsStore((state) => state.timezone);
   const moodLogs = useMoodStore((state) => state.moodLogs);
   const [weekOffset, setWeekOffset] = useState(0);
   const [width, setWidth] = useState(0);
   const labels = weekLabels();
-  const today = todayLocalDateString();
-  const weekStart = addLocalDays(startOfWeekMonday(new Date()), weekOffset * 7);
+  const today = todayLocalDateString(timezone);
+  const weekStart = addLocalDays(startOfWeekMonday(new Date(), timezone), weekOffset * 7, timezone);
   const isCurrentWeek = weekOffset === 0;
   const dates = Array.from({ length: 7 }, (_, index) =>
-    toLocalDateString(addLocalDays(weekStart, index)),
+    toLocalDateString(addLocalDays(weekStart, index, timezone), timezone),
   );
   const points = dates.map((date) => {
     const entry = moodLogs.find((logEntry) => logEntry.date === date);
@@ -1091,7 +1124,7 @@ function MoodChart() {
       }
     >
       <WeekSwitch
-        label={isCurrentWeek ? i18n.t("this_week") : weekRangeLabel(weekStart, language)}
+        label={isCurrentWeek ? i18n.t("this_week") : weekRangeLabel(weekStart, language, timezone)}
         canGoForward={weekOffset < 0}
         onShift={shiftWeek}
       />

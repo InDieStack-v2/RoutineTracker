@@ -14,7 +14,7 @@ import { Emojis } from "@/constants/Moods";
 import i18n from "@/i18n";
 import { useMoodStore } from "@/store/moodStore";
 import { useSettingsStore } from "@/store/settingsStore";
-import { toLocalDateString, todayLocalDateString } from "@/utils/dateUtils";
+import { calendarDateString, currentCalendar, todayLocalDateString } from "@/utils/dateUtils";
 
 const MOOD_COLORS = ["#D1FAE5", "#E0F2FE", "#F3F4F6", "#FEF3C7", "#FEE2E2"];
 const ACCENT = "#8882e7";
@@ -163,14 +163,22 @@ function MoodPicker({
 
 export default function MoodScreen() {
   const language = useSettingsStore((state) => state.language);
+  const timezone = useSettingsStore((state) => state.timezone);
   const moodLogs = useMoodStore((state) => state.moodLogs);
   const addMoodLog = useMoodStore((state) => state.addMoodLog);
-  const [currentDate, setCurrentDate] = useState(
-    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  );
+  const [currentDate, setCurrentDate] = useState(() => {
+    const now = currentCalendar();
+    return new Date(now.year, now.month, 1);
+  });
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedMoodIndex, setSelectedMoodIndex] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [monthZone, setMonthZone] = useState(timezone);
+  if (monthZone !== timezone) {
+    const now = currentCalendar();
+    setMonthZone(timezone);
+    setCurrentDate(new Date(now.year, now.month, 1));
+  }
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const today = todayLocalDateString();
@@ -190,8 +198,7 @@ export default function MoodScreen() {
   })();
 
   const openDay = (day: number) => {
-    const date = new Date(year, month, day);
-    const dateStr = toLocalDateString(date);
+    const dateStr = calendarDateString(year, month, day);
     if (dateStr > today) return;
     const log = moodLogs.find((entry) => entry.date === dateStr);
     setSelectedDate(dateStr);
@@ -261,7 +268,7 @@ export default function MoodScreen() {
             ))}
             {Array.from({ length: daysInMonth }, (_, index) => {
               const day = index + 1;
-              const dateStr = toLocalDateString(new Date(year, month, day));
+              const dateStr = calendarDateString(year, month, day);
               const log = moodLogs.find((entry) => entry.date === dateStr);
               const isToday = dateStr === today;
               const isFuture = dateStr > today;
