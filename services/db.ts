@@ -51,76 +51,77 @@ const MIGRATIONS: (string | ((db: SQLiteDatabase) => Promise<void>))[] = [
 
   // Version 2: Migrate task_completions and mood_logs to use UTC datetime
   async function migrateV2(db: SQLiteDatabase): Promise<void> {
-    await db.withExclusiveTransactionAsync(async (tx) => {
-      // Disable foreign keys during migration
-      await tx.execAsync('PRAGMA foreign_keys = OFF');
+    const run = async (tx: SQLiteDatabase) => {
+      await tx.execAsync('DROP TABLE IF EXISTS new_task_completions');
+      await tx.execAsync('DROP TABLE IF EXISTS new_mood_logs');
 
+      await tx.execAsync(`
+        CREATE TABLE new_task_completions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          task_id TEXT NOT NULL,
+          completed_at_utc TEXT NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES routine_tasks(id) ON DELETE CASCADE
+        )
+      `);
+
+      await tx.execAsync(`
+        CREATE TABLE new_mood_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          logged_at TEXT NOT NULL,
+          mood_index INTEGER NOT NULL
+        )
+      `);
+
+      const completions = await tx.getAllAsync<{ id: number; task_id: string; date: string; completed_at: string }>(
+        'SELECT id, task_id, date, completed_at FROM task_completions'
+      );
+      for (const row of completions) {
+        const [y, m, d] = row.date.split('-').map(Number);
+        const completedAtUTC = new Date(y, m - 1, d).toISOString();
+        await tx.runAsync(
+          'INSERT INTO new_task_completions (id, task_id, completed_at_utc) VALUES (?, ?, ?)',
+          row.id,
+          row.task_id,
+          completedAtUTC
+        );
+      }
+
+      const moodLogs = await tx.getAllAsync<{ date: string; mood_index: number }>(
+        'SELECT date, mood_index FROM mood_logs'
+      );
+      for (const row of moodLogs) {
+        const [y, m, d] = row.date.split('-').map(Number);
+        const loggedAtUTC = new Date(y, m - 1, d).toISOString();
+        await tx.runAsync(
+          'INSERT INTO new_mood_logs (logged_at, mood_index) VALUES (?, ?)',
+          loggedAtUTC,
+          row.mood_index
+        );
+      }
+
+      await tx.execAsync('DROP TABLE IF EXISTS task_completions');
+      await tx.execAsync('DROP TABLE IF EXISTS mood_logs');
+      await tx.execAsync('ALTER TABLE new_task_completions RENAME TO task_completions');
+      await tx.execAsync('ALTER TABLE new_mood_logs RENAME TO mood_logs');
+      await tx.execAsync('CREATE INDEX idx_task_completions_task_id ON task_completions(task_id)');
+      await tx.execAsync('CREATE INDEX idx_task_completions_completed_at ON task_completions(completed_at_utc)');
+    };
+
+    if (Platform.OS === 'web') {
+      await db.execAsync('PRAGMA foreign_keys = OFF');
       try {
-        // Idempotency guards: drop new tables if they exist
-        await tx.execAsync('DROP TABLE IF EXISTS new_task_completions');
-        await tx.execAsync('DROP TABLE IF EXISTS new_mood_logs');
-
-        // Create new_task_completions table with UTC datetime column
-        await tx.execAsync(`
-          CREATE TABLE new_task_completions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            task_id TEXT NOT NULL,
-            completed_at_utc TEXT NOT NULL,
-            FOREIGN KEY (task_id) REFERENCES routine_tasks(id) ON DELETE CASCADE
-          )
-        `);
-
-        // Create new_mood_logs table with UTC datetime column
-        await tx.execAsync(`
-          CREATE TABLE new_mood_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            logged_at TEXT NOT NULL,
-            mood_index INTEGER NOT NULL
-          )
-        `);
-
-        // Migrate existing data from task_completions
-        const completions = await tx.getAllAsync<{ id: number; task_id: string; date: string; completed_at: string }>(
-          'SELECT id, task_id, date, completed_at FROM task_completions'
-        );
-        for (const row of completions) {
-          const [y, m, d] = row.date.split('-').map(Number);
-          const completedAtUTC = new Date(y, m - 1, d).toISOString();
-          await tx.runAsync(
-            'INSERT INTO new_task_completions (id, task_id, completed_at_utc) VALUES (?, ?, ?)',
-            row.id,
-            row.task_id,
-            completedAtUTC
-          );
-        }
-
-        // Migrate existing data from mood_logs
-        const moodLogs = await tx.getAllAsync<{ date: string; mood_index: number }>(
-          'SELECT date, mood_index FROM mood_logs'
-        );
-        for (const row of moodLogs) {
-          const [y, m, d] = row.date.split('-').map(Number);
-          const loggedAtUTC = new Date(y, m - 1, d).toISOString();
-          await tx.runAsync(
-            'INSERT INTO new_mood_logs (logged_at, mood_index) VALUES (?, ?)',
-            loggedAtUTC,
-            row.mood_index
-          );
-        }
-
-        // Drop old tables
-        await tx.execAsync('DROP TABLE IF EXISTS task_completions');
-        await tx.execAsync('DROP TABLE IF EXISTS mood_logs');
-
-        // Rename new tables
-        await tx.execAsync('ALTER TABLE new_task_completions RENAME TO task_completions');
-        await tx.execAsync('ALTER TABLE new_mood_logs RENAME TO mood_logs');
-
-        // Recreate indexes
-        await tx.execAsync('CREATE INDEX idx_task_completions_task_id ON task_completions(task_id)');
-        await tx.execAsync('CREATE INDEX idx_task_completions_completed_at ON task_completions(completed_at_utc)');
+        await db.withTransactionAsync(() => run(db));
       } finally {
-        // Re-enable foreign keys
+        await db.execAsync('PRAGMA foreign_keys = ON');
+      }
+      return;
+    }
+
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync('PRAGMA foreign_keys = OFF');
+      try {
+        await run(tx);
+      } finally {
         await tx.execAsync('PRAGMA foreign_keys = ON');
       }
     });

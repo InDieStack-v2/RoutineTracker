@@ -36,8 +36,7 @@ export const ProgressCircle = ({ progressPercent, displayText, textColor }: Prog
           strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
-          rotation="-90"
-          origin={`${radius}, ${radius}`}
+          transform={`rotate(-90 ${radius} ${radius})`}
         />
       </Svg>
       <View style={styles.textContainer}>
