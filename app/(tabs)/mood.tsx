@@ -129,10 +129,10 @@ function MoodPicker({
                 style={{ backgroundColor: selected ? "#f3f1ff" : "#f9fafb" }}
               >
                 <View
-                  className="h-10 w-10 items-center justify-center rounded-full mr-3"
+                  className="h-12 w-12 items-center justify-center rounded-full mr-3"
                   style={{ backgroundColor: selected ? ACCENT : MOOD_COLORS[index] }}
                 >
-                  <Text style={{ fontSize: 22 }}>{Emojis[index]}</Text>
+                  <Text style={{ fontSize: 30, lineHeight: 34 }}>{Emojis[index]}</Text>
                 </View>
                 <Text
                   className="flex-1 text-base font-semibold"
@@ -283,7 +283,7 @@ export default function MoodScreen() {
                     }}
                   >
                     {log ? (
-                      <Text style={{ fontSize: 18 }}>{Emojis[log.moodIndex]}</Text>
+                      <Text style={{ fontSize: 24, lineHeight: 28 }}>{Emojis[log.moodIndex]}</Text>
                     ) : (
                       <Text
                         className="text-sm font-semibold"
@@ -305,7 +305,8 @@ export default function MoodScreen() {
           </Text>
           {topMood ? (
             <Text className="text-sm font-semibold text-gray-700">
-              {topMood.emoji} {topMood.label}
+              <Text style={{ fontSize: 20, lineHeight: 24 }}>{topMood.emoji}</Text>
+              {` ${topMood.label}`}
             </Text>
           ) : null}
         </View>
