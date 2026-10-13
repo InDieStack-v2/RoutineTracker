@@ -4,7 +4,6 @@ import { useStreakStore } from "@/store/streakStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useFocusEffect, useRouter, useScrollToTop } from "expo-router";
 import {
-  ArrowRightIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -12,6 +11,8 @@ import {
   ChevronUpIcon,
   EyeOffIcon,
   PlusIcon,
+  StarIcon,
+  StarOffIcon,
   XIcon,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -141,7 +142,6 @@ type RoutineTaskProps = {
   task: Task;
   onToggle: (taskId: string) => void;
   onToggleFavorite: (taskId: string) => void;
-  onDelete?: (taskId: string) => void;
   onSwipeableWillOpen: () => void;
   onClose: () => void;
   closeSelf: () => void;
@@ -196,7 +196,7 @@ const RoutineTask = React.memo(
       {
         task,
         onToggle,
-        onDelete,
+        onToggleFavorite,
         onSwipeableWillOpen,
         onClose,
         closeSelf,
@@ -223,25 +223,21 @@ const RoutineTask = React.memo(
                   label={i18n.t(task.isDone ? "mark_undo" : "mark_done")}
                 />
               )}
-              renderRightActions={
-                task.isDone
-                  ? undefined
-                  : () => (
-                      <SwipeAction
-                        side="right"
-                        color="#6b7280"
-                        icon={ArrowRightIcon}
-                        label={i18n.t("skip")}
-                      />
-                    )
-              }
+              renderRightActions={() => (
+                <SwipeAction
+                  side="right"
+                  color="#6b7280"
+                  icon={task.isFavorite ? StarOffIcon : StarIcon}
+                  label={i18n.t(task.isFavorite ? "unpin" : "pin")}
+                />
+              )}
               onSwipeableWillOpen={onSwipeableWillOpen}
               onSwipeableOpen={(direction) => {
                 closeSelf();
                 if (direction === "left") {
                   onToggle(task.id);
                 } else {
-                  onDelete?.(task.id);
+                  onToggleFavorite(task.id);
                 }
               }}
               onSwipeableClose={() => {
@@ -635,9 +631,6 @@ export default function TaskScreen() {
           task={item}
           onToggle={handleToggleTask}
           onToggleFavorite={handleToggleFavorite}
-          onDelete={(taskId) => {
-            // handle hide routine task
-          }}
           onSwipeableWillOpen={handleSwipeableWillOpen}
           onClose={handleClose}
           closeSelf={() => swipeableRefs.current.get(item.id)?.close()}
@@ -648,11 +641,14 @@ export default function TaskScreen() {
     [handleToggleFavorite, handleToggleTask, handleItemPressed],
   );
 
-  const todoTasks = tasks.filter((task) => !task.isHidden && !task.isDone);
+  const openTasks = tasks.filter((task) => !task.isHidden && !task.isDone);
+  const pinnedTasks = openTasks.filter((task) => task.isFavorite);
+  const todoTasks = openTasks.filter((task) => !task.isFavorite);
   const doneTasks = tasks.filter((task) => !task.isHidden && task.isDone);
   const hiddenCount = tasks.filter((task) => task.isHidden).length;
   const hiddenTasks = showAll ? tasks.filter((task) => task.isHidden) : [];
   const sections = [
+    { title: i18n.t("pinned"), kind: "pinned" as const, data: pinnedTasks },
     { title: i18n.t("todo"), kind: "todo" as const, data: todoTasks },
     { title: i18n.t("completed"), kind: "done" as const, data: doneTasks },
     ...(hiddenCount > 0
@@ -709,13 +705,17 @@ export default function TaskScreen() {
                 </Pressable>
               );
             }
-            if (section.kind === "todo" || section.data.length === 0) {
+            // Todo needs a title only to separate it from the Pinned group above.
+            if (section.data.length === 0 || (section.kind === "todo" && pinnedTasks.length === 0)) {
               return null;
             }
             return (
               <View className="flex-row items-center px-6 py-4 mt-2 mb-2">
+                {section.kind === "pinned" ? (
+                  <Icon as={StarIcon} size="xs" className="mr-1.5 text-[#8882e7]" fill="#8882e7" />
+                ) : null}
                 <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                  {i18n.t("completed")} ({section.data.length})
+                  {section.title} ({section.data.length})
                 </Text>
                 <View className="h-[1px] flex-1 bg-gray-200 dark:bg-gray-700 ml-4" />
               </View>

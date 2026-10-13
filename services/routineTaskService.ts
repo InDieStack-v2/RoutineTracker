@@ -154,7 +154,9 @@ export class RoutineTaskService {
         isDone: finishedRoutineTaskIds.includes(task.id),
         isHidden: onDate != null && !isTaskScheduledOn(task, onDate),
       }))
-      .filter((task) => includeHidden || !task.isHidden);
+      .filter((task) => includeHidden || !task.isHidden)
+      // Pinned (isFavorite) first; sort is stable so the rest keep their order.
+      .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
   }
 
   public static async markFinishedRoutineTask(

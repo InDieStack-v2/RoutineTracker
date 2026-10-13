@@ -65,6 +65,9 @@ export default {
   mark_undo: "Hoàn tác",
   show_all: "Hiện tất cả",
   hidden: "Ẩn",
+  pinned: "Đã ghim",
+  pin: "Ghim",
+  unpin: "Bỏ ghim",
   no_tasks_for_day: "Không có công việc trong ngày này",
   routine_tasks: "Công việc thường ngày",
 

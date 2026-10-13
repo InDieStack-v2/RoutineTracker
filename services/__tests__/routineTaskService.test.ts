@@ -353,6 +353,20 @@ describe('schedule filtering', () => {
     expect(result).toHaveLength(1);
     expect(result[0].isHidden).toBe(false);
   });
+
+  it('puts pinned tasks first and keeps the original order otherwise', async () => {
+    mockDb.getAllAsync.mockResolvedValue([]);
+    const tasks = [
+      makeTask({ id: 'a' }),
+      makeTask({ id: 'b', isFavorite: true }),
+      makeTask({ id: 'c' }),
+      makeTask({ id: 'd', isFavorite: true }),
+    ];
+
+    const result = await RoutineTaskService.getFilteredRoutineTasks(tasks, null);
+
+    expect(result.map((task) => task.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

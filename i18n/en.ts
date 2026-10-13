@@ -65,6 +65,9 @@ export default {
   mark_undo: "Undo",
   show_all: "Show all",
   hidden: "Hidden",
+  pinned: "Pinned",
+  pin: "Pin",
+  unpin: "Unpin",
   no_tasks_for_day: "No tasks for this day",
   routine_tasks: "Routine Tasks",
 
