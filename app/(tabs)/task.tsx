@@ -144,18 +144,13 @@ type RoutineTaskProps = {
   onDelete?: (taskId: string) => void;
   onSwipeableWillOpen: () => void;
   onClose: () => void;
+  closeSelf: () => void;
   onItemPress?: (taskId: string) => void;
 };
 
 const ACTION_WIDTH = 84;
 const FAB_SIZE = 56;
 const FAB_GAP = 16;
-
-function closeSwipeable(ref: React.ForwardedRef<Swipeable>) {
-  if (ref && typeof ref !== "function") {
-    ref.current?.close();
-  }
-}
 
 function SwipeAction({
   label,
@@ -204,6 +199,7 @@ const RoutineTask = React.memo(
         onDelete,
         onSwipeableWillOpen,
         onClose,
+        closeSelf,
         onItemPress,
       },
       ref,
@@ -241,7 +237,7 @@ const RoutineTask = React.memo(
               }
               onSwipeableWillOpen={onSwipeableWillOpen}
               onSwipeableOpen={(direction) => {
-                closeSwipeable(ref);
+                closeSelf();
                 if (direction === "left") {
                   onToggle(task.id);
                 } else {
@@ -531,6 +527,8 @@ export default function TaskScreen() {
   useFocusEffect(
     useCallback(() => {
       sectionListRef.current?.getScrollResponder()?.scrollTo({ y: 0, animated: true });
+      // Close any open swipe when leaving the tab.
+      return () => openSwipeableRef.current?.close();
     }, [])
   );
 
@@ -642,6 +640,7 @@ export default function TaskScreen() {
           }}
           onSwipeableWillOpen={handleSwipeableWillOpen}
           onClose={handleClose}
+          closeSelf={() => swipeableRefs.current.get(item.id)?.close()}
           onItemPress={handleItemPressed}
         />
       );
@@ -663,7 +662,14 @@ export default function TaskScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View className="flex-1 bg-gray-50/50 dark:bg-gray-950 pt-4">
+      <View
+        className="flex-1 bg-gray-50/50 dark:bg-gray-950 pt-4"
+        // Any touch closes the open swipe (tapping elsewhere); never claims the touch.
+        onStartShouldSetResponderCapture={() => {
+          openSwipeableRef.current?.close();
+          return false;
+        }}
+      >
         <SectionList
           ref={sectionListRef}
           sections={sections}
