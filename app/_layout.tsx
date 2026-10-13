@@ -1,11 +1,10 @@
 import "@/global.css";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { CandyContext } from "@/store/context";
 import { useEffect, useState } from "react";
 import { candyStore } from "@/store/candyStore";
@@ -13,7 +12,8 @@ import { useMoodStore } from "@/store/moodStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useStreakStore } from "@/store/streakStore";
 import { scheduleNotificationsForRoutineTasks, setupNotificationHandler } from "@/services/notification";
-import { AppState, Platform } from "react-native";
+import { Appearance, AppState, Platform } from "react-native";
+import { useIsDark } from "@/hooks/useIsDark";
 import log from "@/services/logger";
 import { getDB } from "@/services/db";
 import { migrateFromAsyncStorage } from "@/services/migration";
@@ -29,8 +29,15 @@ function CandyProvider({ children }: CandyProviderProps) {
 }
 
 
+function NavigationTheme({ children }: React.PropsWithChildren) {
+  return (
+    <ThemeProvider value={useIsDark() ? DarkTheme : DefaultTheme}>{children}</ThemeProvider>
+  );
+}
+
 export default function RootLayout() {
-  // const colorScheme = useColorScheme();
+  const theme = useSettingsStore((state) => state.theme);
+  const isDark = useIsDark();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -65,6 +72,13 @@ export default function RootLayout() {
 
     initializeApp();
   }, []);
+
+  // Keep native chrome (blur tab bar, pickers, status bar) in step with the chosen theme.
+  useEffect(() => {
+    // react-native-web's Appearance has no setColorScheme; nativewind handles web.
+    if (Platform.OS === "web") return;
+    Appearance.setColorScheme(theme === "system" ? "unspecified" : theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -101,14 +115,16 @@ export default function RootLayout() {
   }
 
   return (
-    <GluestackUIProvider mode="light">
-      <CandyProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </CandyProvider>
+    <GluestackUIProvider mode={isDark ? "dark" : "light"}>
+      <NavigationTheme>
+        <CandyProvider>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </CandyProvider>
+      </NavigationTheme>
     </GluestackUIProvider>
   );
 }

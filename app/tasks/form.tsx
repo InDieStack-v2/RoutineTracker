@@ -66,8 +66,8 @@ const ColorInput = React.memo(({ control }: { control: any; errors: any }) => {
       control={control}
       name="color"
       render={({ field: { onChange, value } }) => (
-        <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4 shadow-sm">
-          <Heading size="md" className="mb-4 text-gray-800">
+        <Box className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 mb-4 shadow-sm">
+          <Heading size="md" className="mb-4 text-gray-800 dark:text-gray-100">
             {i18n.t('color')}
           </Heading>
           <Grid
@@ -85,10 +85,10 @@ const ColorInput = React.memo(({ control }: { control: any; errors: any }) => {
                     onChange(c);
                   }}
                   style={{ backgroundColor: c }}
-                  className="w-12 h-12 rounded-full justify-center items-center shadow-sm border border-gray-100"
+                  className="w-12 h-12 rounded-full justify-center items-center shadow-sm border border-gray-100 dark:border-gray-800"
                 >
                   {value === c && (
-                    <Icon as={CheckIcon} className="w-6 h-6 text-gray-700" />
+                    <Icon as={CheckIcon} className="w-6 h-6 text-gray-700 dark:text-gray-200" />
                   )}
                 </Pressable>
               </GridItem>
@@ -112,8 +112,8 @@ const DoItAtInput = React.memo(({ control }: { control: any; errors: any }) => {
     onChange: (value: string | null) => void;
   }) => {
     return (
-      <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4 shadow-sm">
-        <Heading size="md" className="mb-4 text-gray-800">
+      <Box className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 mb-4 shadow-sm">
+        <Heading size="md" className="mb-4 text-gray-800 dark:text-gray-100">
           {i18n.t('do_it_at')}
         </Heading>
         <HStack className="gap-3">
@@ -124,12 +124,12 @@ const DoItAtInput = React.memo(({ control }: { control: any; errors: any }) => {
               className={`flex-1 py-3 px-2 rounded-xl items-center justify-center border ${
                 value === option
                   ? "bg-[#8882e7] border-[#8882e7]"
-                  : "bg-gray-50 border-gray-200"
+                  : "bg-gray-50 dark:bg-gray-950 border-gray-200 dark:border-gray-700"
               }`}
             >
               <Text
                 className={`text-sm font-semibold capitalize ${
-                  value === option ? "text-white" : "text-gray-600"
+                  value === option ? "text-white" : "text-gray-600 dark:text-gray-300"
                 }`}
               >
                 {i18n.t(option)}
@@ -179,8 +179,8 @@ const RepeatInput = React.memo(({
     onChange: (value: string) => void;
   }) => {
     return (
-      <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4 shadow-sm">
-        <Heading size="md" className="mb-4 text-gray-800">
+      <Box className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 mb-4 shadow-sm">
+        <Heading size="md" className="mb-4 text-gray-800 dark:text-gray-100">
           {i18n.t('repeat')}
         </Heading>
         <HStack className="gap-3">
@@ -202,12 +202,12 @@ const RepeatInput = React.memo(({
               className={`flex-1 py-3 px-2 rounded-xl items-center justify-center border ${
                 repeatType === option
                   ? "bg-[#8882e7] border-[#8882e7]"
-                  : "bg-gray-50 border-gray-200"
+                  : "bg-gray-50 dark:bg-gray-950 border-gray-200 dark:border-gray-700"
               }`}
             >
               <Text
                 className={`text-sm font-semibold capitalize ${
-                  repeatType === option ? "text-white" : "text-gray-600"
+                  repeatType === option ? "text-white" : "text-gray-600 dark:text-gray-300"
                 }`}
               >
                 {i18n.t(option)}
@@ -228,13 +228,13 @@ const RepeatInput = React.memo(({
   }) => {
     const allDay = repeatValues.length === 7;
     return (
-      <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4 shadow-sm">
+      <Box className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 mb-4 shadow-sm">
         <View className="flex-row items-center justify-between mb-4">
-          <Heading size="md" className="text-gray-800">
+          <Heading size="md" className="text-gray-800 dark:text-gray-100">
             {i18n.t('on_these_days')}
           </Heading>
           <Pressable
-            className="flex-row items-center bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200"
+            className="flex-row items-center bg-gray-50 dark:bg-gray-950 px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700"
             onPress={() => {
               if (allDay) {
                 onChange([]);
@@ -243,12 +243,12 @@ const RepeatInput = React.memo(({
               }
             }}
           >
-            <Text className="text-xs font-semibold text-gray-600 mr-2">
+            <Text className="text-xs font-semibold text-gray-600 dark:text-gray-300 mr-2">
               {i18n.t('all_day')}
             </Text>
             <View
               className={`w-4 h-4 rounded-full border items-center justify-center ${
-                allDay ? "bg-[#8882e7] border-[#8882e7]" : "border-gray-400"
+                allDay ? "bg-[#8882e7] border-[#8882e7]" : "border-gray-400 dark:border-gray-500"
               }`}
             >
               {allDay && <Icon as={CheckIcon} className="text-white w-3 h-3" />}
@@ -272,7 +272,7 @@ const RepeatInput = React.memo(({
               className={`items-center justify-center rounded-xl w-10 h-12 border ${
                 allDay || repeatValues.includes(day)
                   ? "bg-[#8882e7] border-[#8882e7]"
-                  : "bg-gray-50 border-gray-200"
+                  : "bg-gray-50 dark:bg-gray-950 border-gray-200 dark:border-gray-700"
               }`}
             >
               <Text
@@ -299,8 +299,8 @@ const RepeatInput = React.memo(({
     onChange: (values: string[]) => void;
   }) => {
     return (
-      <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4">
-        <Heading size="md" className="mb-4 text-gray-800">
+      <Box className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 mb-4">
+        <Heading size="md" className="mb-4 text-gray-800 dark:text-gray-100">
           {i18n.t("on_these_days")}
         </Heading>
         <View className="flex-row flex-wrap">
@@ -326,12 +326,12 @@ const RepeatInput = React.memo(({
                   className={`h-8 w-8 items-center justify-center rounded-full border ${
                     selected
                       ? "bg-[#8882e7] border-[#8882e7]"
-                      : "bg-gray-50 border-gray-200"
+                      : "bg-gray-50 dark:bg-gray-950 border-gray-200 dark:border-gray-700"
                   }`}
                 >
                   <Text
                     className={`text-sm font-semibold ${
-                      selected ? "text-white" : "text-gray-600"
+                      selected ? "text-white" : "text-gray-600 dark:text-gray-300"
                     }`}
                   >
                     {day}
@@ -390,8 +390,8 @@ const IconInput = React.memo(
         rules={{ required: false }}
         name="icon"
         render={({ field: { onChange, value } }) => (
-          <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4 shadow-sm">
-            <Heading size="md" className="mb-2 text-gray-800">
+          <Box className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 mb-4 shadow-sm">
+            <Heading size="md" className="mb-2 text-gray-800 dark:text-gray-100">
               {i18n.t('icon')}
             </Heading>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -405,7 +405,7 @@ const IconInput = React.memo(
                     className={`items-center justify-center rounded-xl w-12 h-12 border ${
                       value === e
                         ? "bg-[#8882e7]/10 border-[#8882e7]"
-                        : "bg-gray-50 border-gray-100"
+                        : "bg-gray-50 dark:bg-gray-950 border-gray-100 dark:border-gray-800"
                     }`}
                   >
                     <Text className="text-2xl">{e}</Text>
@@ -468,16 +468,16 @@ const Page = () => {
   }, [navigation]);
 
   return (
-    <View className="flex-1 bg-gray-50/50">
+    <View className="flex-1 bg-gray-50/50 dark:bg-gray-950">
       {/* Header */}
-      <View className="px-4 pt-14 pb-4 bg-white border-b border-gray-100 flex-row items-center justify-between shadow-sm z-10">
+      <View className="px-4 pt-14 pb-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-row items-center justify-between shadow-sm z-10">
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          className="w-10 h-10 items-center justify-center rounded-full bg-gray-50 active:bg-gray-100"
+          className="w-10 h-10 items-center justify-center rounded-full bg-gray-50 dark:bg-gray-950 active:bg-gray-100"
         >
-          <Icon as={ArrowLeftIcon} className="text-gray-800 w-6 h-6" />
+          <Icon as={ArrowLeftIcon} className="text-gray-800 dark:text-gray-100 w-6 h-6" />
         </TouchableOpacity>
-        <Heading size="lg" className="text-gray-800 font-bold">
+        <Heading size="lg" className="text-gray-800 dark:text-gray-100 font-bold">
           {isEdit ? i18n.t('edit_task') : i18n.t('new_task')}
         </Heading>
         <View className="w-10" /> 
@@ -493,16 +493,16 @@ const Page = () => {
             name="name"
             rules={{ required: i18n.t('task_name_required') }}
             render={({ field: { onChange, value } }) => (
-              <Box className="bg-white rounded-2xl p-4 border border-gray-100 mb-4 shadow-sm">
-                <Heading size="md" className="mb-3 text-gray-800">
+              <Box className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 mb-4 shadow-sm">
+                <Heading size="md" className="mb-3 text-gray-800 dark:text-gray-100">
                   {i18n.t('task_name')}
                 </Heading>
-                <Input className="bg-gray-50 border border-gray-200 h-12 rounded-xl">
+                <Input className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-700 h-12 rounded-xl">
                   <InputField
                     value={value}
                     onChangeText={onChange}
                     placeholder={i18n.t('task_name_placeholder')}
-                    className="font-medium text-gray-800 text-sm"
+                    className="font-medium text-gray-800 dark:text-gray-100 text-sm"
                     placeholderTextColor="#9ca3af"
                   />
                 </Input>

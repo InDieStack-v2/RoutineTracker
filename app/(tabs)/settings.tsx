@@ -12,29 +12,30 @@ import { useSettingsStore } from "@/store/settingsStore";
 import i18n from "@/i18n";
 import { deviceTimeZone, isSystemTimeZone, listTimeZones, timeZoneOffsetLabel } from "@/utils/timezone";
 import { Stack } from "expo-router";
+import { useIsDark } from "@/hooks/useIsDark";
 import { Icon } from "@/components/ui/icon";
 import { scheduleNotificationsForRoutineTasks } from "@/services/notification";
 
 // Flip on when manual timezone selection should ship.
 const TIMEZONE_SELECTION_ENABLED = false;
 
-function LanguageOption({
+function Option<T extends string>({
   label,
   value,
-  language,
+  selected,
   onSelect,
 }: {
   label: string;
-  value: "en" | "vi";
-  language: "en" | "vi";
-  onSelect: (value: "en" | "vi") => void;
+  value: T;
+  selected: T;
+  onSelect: (value: T) => void;
 }) {
-  const isSelected = language === value;
+  const isSelected = selected === value;
   return (
     <Pressable onPress={() => onSelect(value)}>
-      <HStack className="justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
+      <HStack className="justify-between items-center py-3 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
         <Text
-          className={`text-base ${isSelected ? "text-gray-900 font-medium" : "text-gray-600"}`}
+          className={`text-base ${isSelected ? "text-gray-900 dark:text-gray-50 font-medium" : "text-gray-600 dark:text-gray-300"}`}
         >
           {label}
         </Text>
@@ -94,7 +95,7 @@ function TimezonePicker({
       >
         <HStack className="justify-between items-center py-3">
           <VStack>
-            <Text className="text-base text-gray-900">{selectedLabel}</Text>
+            <Text className="text-base text-gray-900 dark:text-gray-50">{selectedLabel}</Text>
             <Text className="text-sm text-gray-500">{selectedDetail}</Text>
           </VStack>
           <Icon as={ChevronRightIcon} className="text-gray-400 w-5 h-5" />
@@ -108,11 +109,11 @@ function TimezonePicker({
         >
           <Pressable
             onPress={() => {}}
-            className="bg-white rounded-3xl border border-gray-100 overflow-hidden"
+            className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden"
             style={styles.modal}
           >
             <VStack className="px-5 pt-5 pb-3" space="sm">
-              <Text className="text-base font-semibold text-gray-900">{i18n.t("timezone")}</Text>
+              <Text className="text-base font-semibold text-gray-900 dark:text-gray-50">{i18n.t("timezone")}</Text>
               <TextInput
                 value={query}
                 onChangeText={setQuery}
@@ -125,9 +126,9 @@ function TimezonePicker({
             </VStack>
             {showSystem ? (
               <Pressable onPress={() => choose("system")} className="px-5">
-                <HStack className="justify-between items-center py-3 border-b border-gray-100">
+                <HStack className="justify-between items-center py-3 border-b border-gray-100 dark:border-gray-800">
                   <VStack>
-                    <Text className="text-base text-gray-900">{i18n.t("system")}</Text>
+                    <Text className="text-base text-gray-900 dark:text-gray-50">{i18n.t("system")}</Text>
                     <Text className="text-sm text-gray-500">{deviceZone.replace(/_/g, " ")}</Text>
                   </VStack>
                   {isSystemTimeZone(timezone) ? (
@@ -148,9 +149,9 @@ function TimezonePicker({
                 const selected = item === timezone;
                 return (
                   <Pressable onPress={() => choose(item)} className="px-5">
-                    <HStack className="justify-between items-center py-3 border-b border-gray-100">
+                    <HStack className="justify-between items-center py-3 border-b border-gray-100 dark:border-gray-800">
                       <VStack className="flex-1 pr-3">
-                        <Text className={`text-base ${selected ? "text-gray-900 font-medium" : "text-gray-700"}`}>
+                        <Text className={`text-base ${selected ? "text-gray-900 dark:text-gray-50 font-medium" : "text-gray-700 dark:text-gray-200"}`}>
                           {item.replace(/_/g, " ")}
                         </Text>
                         <Text className="text-sm text-gray-500">{timeZoneOffsetLabel(item)}</Text>
@@ -170,10 +171,11 @@ function TimezonePicker({
 
 
 export default function SettingScreen() {
-  const { language, setLanguage, timezone, setTimezone, reminderTime, setReminderTime } =
+  const { language, setLanguage, theme, setTheme, timezone, setTimezone, reminderTime, setReminderTime } =
     useSettingsStore();
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  const isDark = useIsDark();
   const timeDate = new Date(reminderTime);
 
   // Ensure valid date
@@ -206,12 +208,13 @@ export default function SettingScreen() {
 
 
   return (
-    <Box className="flex-1 bg-gray-50">
+    <Box className="flex-1 bg-gray-50 dark:bg-gray-950">
       <Stack.Screen
         options={{
           title: i18n.t("settings"),
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: "#F9FAFB" }, // Matches bg-gray-50
+          headerStyle: { backgroundColor: isDark ? "#030712" : "#F9FAFB" }, // Matches bg-gray-50 / gray-950
+          headerTintColor: isDark ? "#F9FAFB" : "#111827",
         }}
       />
 
@@ -222,22 +225,39 @@ export default function SettingScreen() {
             {i18n.t("language")}
           </Text>
           <Box
-            className="bg-white rounded-xl px-4 py-1 border border-gray-100"
+            className="bg-white dark:bg-gray-900 rounded-xl px-4 py-1 border border-gray-100 dark:border-gray-800"
             style={styles.shadow}
           >
-            <LanguageOption
+            <Option
               label={i18n.t("english")}
               value="en"
-              language={language}
+              selected={language}
               onSelect={setLanguage}
             />
-            <Box className="h-[1px] bg-gray-100" />
-            <LanguageOption
+            <Box className="h-[1px] bg-gray-100 dark:bg-gray-800" />
+            <Option
               label={i18n.t("vietnamese")}
               value="vi"
-              language={language}
+              selected={language}
               onSelect={setLanguage}
             />
+          </Box>
+        </VStack>
+
+        {/* Theme Section */}
+        <VStack space="xs">
+          <Text className="text-sm font-semibold text-gray-500 uppercase tracking-wider ml-1 mb-2">
+            {i18n.t("theme")}
+          </Text>
+          <Box
+            className="bg-white dark:bg-gray-900 rounded-xl px-4 py-1 border border-gray-100 dark:border-gray-800"
+            style={styles.shadow}
+          >
+            <Option label={i18n.t("system")} value="system" selected={theme} onSelect={setTheme} />
+            <Box className="h-[1px] bg-gray-100 dark:bg-gray-800" />
+            <Option label={i18n.t("light")} value="light" selected={theme} onSelect={setTheme} />
+            <Box className="h-[1px] bg-gray-100 dark:bg-gray-800" />
+            <Option label={i18n.t("dark")} value="dark" selected={theme} onSelect={setTheme} />
           </Box>
         </VStack>
 
@@ -246,7 +266,7 @@ export default function SettingScreen() {
             {i18n.t("timezone")}
           </Text>
           <Box
-            className="bg-white rounded-xl px-4 py-1 border border-gray-100"
+            className="bg-white dark:bg-gray-900 rounded-xl px-4 py-1 border border-gray-100 dark:border-gray-800"
             style={styles.shadow}
           >
             <TimezonePicker
@@ -270,10 +290,10 @@ export default function SettingScreen() {
             {i18n.t("reminder_time")}
           </Text>
           <Box
-            className="bg-white rounded-xl px-4 py-3 border border-gray-100 flex-row justify-between items-center"
+            className="bg-white dark:bg-gray-900 rounded-xl px-4 py-3 border border-gray-100 dark:border-gray-800 flex-row justify-between items-center"
             style={styles.shadow}
           >
-            <Text className="text-base text-gray-900">
+            <Text className="text-base text-gray-900 dark:text-gray-50">
               {i18n.t("daily_reminder")}
             </Text>
 
@@ -291,9 +311,9 @@ export default function SettingScreen() {
             ) : Platform.OS === "android" ? (
               <Pressable
                 onPress={() => setShowTimePicker(true)}
-                className="bg-gray-100 px-3 py-1.5 rounded-md"
+                className="bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md"
               >
-                <Text className="font-medium text-gray-900">
+                <Text className="font-medium text-gray-900 dark:text-gray-50">
                   {formatTime(timeDate)}
                 </Text>
               </Pressable>

@@ -1,5 +1,8 @@
 export default {
   settings: "Cài đặt",
+  theme: "Giao diện",
+  light: "Sáng",
+  dark: "Tối",
   language: "Ngôn ngữ",
   reminder_time: "Thời gian nhắc nhở",
   timezone: "Múi giờ",

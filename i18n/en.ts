@@ -1,5 +1,8 @@
 export default {
   settings: "Settings",
+  theme: "Theme",
+  light: "Light",
+  dark: "Dark",
   language: "Language",
   reminder_time: "Reminder Time",
   timezone: "Timezone",

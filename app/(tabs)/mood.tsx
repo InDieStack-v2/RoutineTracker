@@ -15,6 +15,7 @@ import i18n from "@/i18n";
 import { useMoodStore } from "@/store/moodStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { calendarDateString, currentCalendar, todayLocalDateString } from "@/utils/dateUtils";
+import { useIsDark } from "@/hooks/useIsDark";
 
 const MOOD_COLORS = ["#D1FAE5", "#E0F2FE", "#F3F4F6", "#FEF3C7", "#FEE2E2"];
 const ACCENT = "#8882e7";
@@ -79,6 +80,7 @@ function MoodPicker({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const dark = useIsDark();
   const labels = moodLabels();
 
   return (
@@ -95,7 +97,7 @@ function MoodPicker({
       >
         <Pressable
           onPress={() => {}}
-          className="w-full bg-white rounded-3xl p-5 border border-gray-100"
+          className="w-full bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-100 dark:border-gray-800"
           style={
             Platform.OS === "web"
               ? ({
@@ -112,7 +114,7 @@ function MoodPicker({
                 }
           }
         >
-          <Text className="text-lg font-semibold text-gray-900 text-center">
+          <Text className="text-lg font-semibold text-gray-900 dark:text-gray-50 text-center">
             {i18n.t("how_are_you_feeling")}
           </Text>
           <Text className="text-sm text-gray-400 text-center mt-1 mb-4">
@@ -126,7 +128,7 @@ function MoodPicker({
                 accessibilityRole="button"
                 onPress={() => onSelect(index)}
                 className="flex-row items-center rounded-2xl px-3 py-2.5 mb-2"
-                style={{ backgroundColor: selected ? "#f3f1ff" : "#f9fafb" }}
+                style={{ backgroundColor: selected ? (dark ? "#2a2850" : "#f3f1ff") : dark ? "#1f2937" : "#f9fafb" }}
               >
                 <View
                   className="h-12 w-12 items-center justify-center rounded-full mr-3"
@@ -136,7 +138,7 @@ function MoodPicker({
                 </View>
                 <Text
                   className="flex-1 text-base font-semibold"
-                  style={{ color: selected ? ACCENT : "#374151" }}
+                  style={{ color: selected ? ACCENT : dark ? "#e5e7eb" : "#374151" }}
                 >
                   {label}
                 </Text>
@@ -148,7 +150,7 @@ function MoodPicker({
             disabled={selectedIndex === null}
             onPress={onSave}
             className="mt-2 h-12 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: selectedIndex === null ? "#e5e7eb" : ACCENT }}
+            style={{ backgroundColor: selectedIndex === null ? (dark ? "#374151" : "#e5e7eb") : ACCENT }}
           >
             <Text className="text-white font-semibold">
               {selectedIndex === null ? i18n.t("select_mood") : i18n.t("save_mood")}
@@ -162,6 +164,7 @@ function MoodPicker({
 
 
 export default function MoodScreen() {
+  const dark = useIsDark();
   const language = useSettingsStore((state) => state.language);
   const timezone = useSettingsStore((state) => state.timezone);
   const moodLogs = useMoodStore((state) => state.moodLogs);
@@ -213,7 +216,7 @@ export default function MoodScreen() {
   };
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-gray-50 dark:bg-gray-950">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
@@ -226,26 +229,26 @@ export default function MoodScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="bg-white rounded-3xl p-5 border border-gray-100" style={cardShadow}>
+        <View className="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-100 dark:border-gray-800" style={cardShadow}>
           <View className="flex-row items-center justify-between mb-5">
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={i18n.t("previous_month")}
               onPress={() => setCurrentDate(new Date(year, month - 1, 1))}
-              className="h-9 w-9 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+              className="h-9 w-9 items-center justify-center rounded-full bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800"
             >
-              <Icon as={ChevronLeftIcon} size="sm" className="text-gray-600" />
+              <Icon as={ChevronLeftIcon} size="sm" className="text-gray-600 dark:text-gray-300" />
             </Pressable>
-            <Text className="text-lg font-semibold text-gray-900">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-gray-50">
               {currentDate.toLocaleDateString(locale, { month: "long", year: "numeric" })}
             </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={i18n.t("next_month")}
               onPress={() => setCurrentDate(new Date(year, month + 1, 1))}
-              className="h-9 w-9 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+              className="h-9 w-9 items-center justify-center rounded-full bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800"
             >
-              <Icon as={ChevronRightIcon} size="sm" className="text-gray-600" />
+              <Icon as={ChevronRightIcon} size="sm" className="text-gray-600 dark:text-gray-300" />
             </Pressable>
           </View>
 
@@ -286,7 +289,7 @@ export default function MoodScreen() {
                     style={{
                       backgroundColor: log ? MOOD_COLORS[log.moodIndex] : "transparent",
                       borderWidth: log && !isToday ? 0 : 1,
-                      borderColor: isToday ? ACCENT : "#e5e7eb",
+                      borderColor: isToday ? ACCENT : dark ? "#374151" : "#e5e7eb",
                     }}
                   >
                     {log ? (
@@ -311,7 +314,7 @@ export default function MoodScreen() {
             {i18n.t("moods_logged", { count: monthLogs.length })}
           </Text>
           {topMood ? (
-            <Text className="text-sm font-semibold text-gray-700">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
               <Text style={{ fontSize: 20, lineHeight: 24 }}>{topMood.emoji}</Text>
               {` ${topMood.label}`}
             </Text>

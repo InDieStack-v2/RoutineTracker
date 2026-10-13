@@ -33,14 +33,14 @@ export const Header = ({ title }: HeaderProps) => {
   );
 
   return (
-    <Box className="bg-white">
-      <SafeAreaView edges={['top']} className="bg-white">
+    <Box className="bg-white dark:bg-gray-900">
+      <SafeAreaView edges={['top']} className="bg-white dark:bg-gray-900">
         <Box className="px-6 pb-4 pt-2 flex-row items-center justify-between">
           <VStack>
             <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
               {date}
             </Text>
-            <Text size="3xl" className="font-black text-gray-900 tracking-tight leading-none">
+            <Text size="3xl" className="font-black text-gray-900 dark:text-gray-50 tracking-tight leading-none">
               {title}
             </Text>
           </VStack>

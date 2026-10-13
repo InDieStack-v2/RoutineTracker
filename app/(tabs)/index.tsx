@@ -41,6 +41,7 @@ import Svg, {
   Line as SvgLine,
   Path as SvgPath,
 } from "react-native-svg";
+import { useIsDark } from "@/hooks/useIsDark";
 
 const ACCENT = "#8882e7";
 const ACCENT_SOFT = "#d9d7f8";
@@ -154,7 +155,7 @@ function Board({
   return (
     <View className="mb-4 mx-4">
       <View
-        className="bg-white rounded-3xl px-5 py-5 border border-gray-100"
+        className="bg-white dark:bg-gray-900 rounded-3xl px-5 py-5 border border-gray-100 dark:border-gray-800"
         style={cardShadow}
       >
         <View className="flex-row items-center justify-between mb-4">
@@ -164,7 +165,7 @@ function Board({
                 {eyebrow}
               </Text>
             ) : null}
-            <Text className="text-lg font-semibold text-gray-900">{title}</Text>
+            <Text className="text-lg font-semibold text-gray-900 dark:text-gray-50">{title}</Text>
           </View>
           {trailing}
         </View>
@@ -175,6 +176,7 @@ function Board({
 }
 
 function WeeklyChart() {
+  const dark = useIsDark();
   const language = useSettingsStore((state) => state.language);
   const timezone = useSettingsStore((state) => state.timezone);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -242,7 +244,7 @@ function WeeklyChart() {
     <Board
       title={i18n.t("tasks_completed")}
       trailing={
-        <Text className="text-2xl font-bold text-gray-900">{ready ? total : "–"}</Text>
+        <Text className="text-2xl font-bold text-gray-900 dark:text-gray-50">{ready ? total : "–"}</Text>
       }
     >
       <WeekSwitch
@@ -283,7 +285,7 @@ function WeeklyChart() {
               <Text
                 className="text-xs font-semibold mb-1"
                 style={{
-                  color: selected || bar.isToday ? ACCENT : "#4b5563",
+                  color: selected || bar.isToday ? ACCENT : dark ? "#9ca3af" : "#4b5563",
                   opacity: bar.value > 0 ? 1 : 0,
                 }}
               >
@@ -296,7 +298,7 @@ function WeeklyChart() {
                   maxWidth: 22,
                   height: BAR_TRACK,
                   borderRadius: 8,
-                  backgroundColor: bar.isFuture ? "#f9fafb" : TRACK,
+                  backgroundColor: bar.isFuture ? (dark ? "#111827" : "#f9fafb") : dark ? "#1f2937" : TRACK,
                 }}
               >
                 <View
@@ -346,13 +348,13 @@ function MonthArrow({
       disabled={disabled}
       onPress={onPress}
       hitSlop={8}
-      className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+      className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800"
       style={{ opacity: disabled ? 0.35 : 1 }}
     >
       <Icon
         as={direction === "left" ? ChevronLeftIcon : ChevronRightIcon}
         size="sm"
-        className="text-gray-600"
+        className="text-gray-600 dark:text-gray-300"
       />
     </Pressable>
   );
@@ -376,7 +378,7 @@ function WeekSwitch({
       />
       <Text
         numberOfLines={1}
-        className="flex-1 text-center text-sm font-semibold text-gray-700 mx-2"
+        className="flex-1 text-center text-sm font-semibold text-gray-700 dark:text-gray-200 mx-2"
       >
         {label}
       </Text>
@@ -555,16 +557,17 @@ function tooltipPath(
 }
 
 function TooltipTaskItem({ task }: { task: TaskChip }) {
+  const dark = useIsDark();
   return (
     <View className="flex-row items-center" style={{ minHeight: 36 }}>
       <View
-        className="items-center justify-center border border-gray-100"
+        className="items-center justify-center border border-gray-100 dark:border-gray-800"
         style={{
           width: 28,
           height: 28,
           borderRadius: 14,
           marginRight: 10,
-          backgroundColor: task.color ? `${task.color}20` : "#f3f4f6",
+          backgroundColor: task.color ? `${task.color}20` : dark ? "#1f2937" : "#f3f4f6",
           opacity: task.deleted ? 0.55 : 1,
         }}
       >
@@ -583,7 +586,7 @@ function TooltipTaskItem({ task }: { task: TaskChip }) {
       <Text
         numberOfLines={1}
         className={`flex-1 text-sm font-semibold ${
-          task.deleted ? "text-gray-400" : "text-gray-800"
+          task.deleted ? "text-gray-400" : "text-gray-800 dark:text-gray-100"
         }`}
       >
         {task.label}
@@ -608,6 +611,7 @@ function DayTasksTooltip({
   tasks: TaskChip[];
   onClose: () => void;
 }) {
+  const dark = useIsDark();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [tipHeight, setTipHeight] = useState(0);
   const tipWidth = Math.min(TOOLTIP_WIDTH, screenWidth - TOOLTIP_MARGIN * 2);
@@ -663,8 +667,8 @@ function DayTasksTooltip({
                   frame.caretLeft,
                   frame.placeBelow,
                 )}
-                fill="#ffffff"
-                stroke={TOOLTIP_BORDER}
+                fill={dark ? "#111827" : "#ffffff"}
+                stroke={dark ? "#1f2937" : TOOLTIP_BORDER}
                 strokeWidth={1}
                 strokeLinejoin="miter"
                 strokeMiterlimit={4}
@@ -696,6 +700,7 @@ function DayTasksTooltip({
 }
 
 function MonthlyCalendar() {
+  const dark = useIsDark();
   const language = useSettingsStore((state) => state.language);
   const timezone = useSettingsStore((state) => state.timezone);
   const routineTasks = useCandyContext((state) => state.routineTasks);
@@ -901,10 +906,12 @@ function MonthlyCalendar() {
                     displayText={String(Number(dateStr.slice(8)))}
                     textColor={
                       isFuture
-                        ? "#d1d5db"
+                        ? (dark ? "#4b5563" : "#d1d5db")
                         : selected || isToday || percent > 0
                           ? ACCENT
-                          : "#4b5563"
+                          : dark
+                            ? "#9ca3af"
+                            : "#4b5563"
                     }
                   />
                 </View>
@@ -936,6 +943,7 @@ function MoodLine({
   todayIndex: number;
   width: number;
 }) {
+  const dark = useIsDark();
   const chartWidth = Math.max(0, width - EMOJI_COL);
   const groups: number[][] = [];
   let current: number[] = [];
@@ -978,7 +986,7 @@ function MoodLine({
                 x2={chartWidth}
                 y1={yFor(5 - index)}
                 y2={yFor(5 - index)}
-                stroke="#f3f4f6"
+                stroke={dark ? "#1f2937" : "#f3f4f6"}
                 strokeWidth={1}
               />
             ))}
@@ -1018,7 +1026,7 @@ function MoodLine({
                   cx={xFor(index, chartWidth)}
                   cy={yFor(point)}
                   r={11}
-                  fill="#ffffff"
+                  fill={dark ? "#111827" : "#ffffff"}
                   stroke={ACCENT}
                   strokeWidth={1.5}
                 />
@@ -1158,7 +1166,7 @@ export default function HomeScreen() {
   useScrollToTop(scrollViewRef);
 
   return (
-    <View className="flex-1 bg-gray-50" style={{ width: "100%", overflow: "hidden" }}>
+    <View className="flex-1 bg-gray-50 dark:bg-gray-950" style={{ width: "100%", overflow: "hidden" }}>
       <ScrollView
         ref={scrollViewRef}
         className="flex-1"

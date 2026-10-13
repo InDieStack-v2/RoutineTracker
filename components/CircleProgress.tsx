@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { useIsDark } from '@/hooks/useIsDark';
 
 type ProgressCircleProps = {
   progressPercent: number;
@@ -15,6 +16,7 @@ export const ProgressCircle = ({
   textColor,
   size = 32,
 }: ProgressCircleProps) => {
+  const dark = useIsDark();
   const strokeWidth = Math.max(2, size * 0.1);
   const radius = size / 2;
   const normalizedRadius = radius - strokeWidth / 2;
@@ -29,7 +31,7 @@ export const ProgressCircle = ({
     <View style={[styles.container, { width: size, height: size }]}>
       <Svg height={size} width={size}>
         <Circle
-          stroke="#f3f4f6"
+          stroke={dark ? "#1f2937" : "#f3f4f6"}
           fill="none"
           cx={radius}
           cy={radius}
@@ -56,7 +58,7 @@ export const ProgressCircle = ({
           style={{
             fontSize: Math.max(10, Math.round(size * 0.34)),
             fontWeight: '600',
-            color: textColor ?? '#4b5563',
+            color: textColor ?? (dark ? '#9ca3af' : '#4b5563'),
           }}
         >
           {displayText}

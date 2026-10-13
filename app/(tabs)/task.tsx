@@ -36,6 +36,7 @@ import { Fab } from "@/components/ui/fab";
 import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import i18n from "@/i18n";
 import { calendarDateString, noonOnCalendarDate, shiftCalendarDate, toLocalDateString, todayLocalDateString } from "@/utils/dateUtils";
+import { useIsDark } from "@/hooks/useIsDark";
 
 type Task = {
   id: string;
@@ -59,7 +60,7 @@ const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
   return (
     <View
       className={`rounded-2xl p-4 border flex-row items-center ${
-        hidden ? "bg-gray-50 border-gray-300" : "bg-white border-gray-100"
+        hidden ? "bg-gray-50 dark:bg-gray-950 border-gray-300 dark:border-gray-600" : "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800"
       }`}
       style={
         hidden
@@ -83,7 +84,7 @@ const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
         activeOpacity={0.7}
       >
         <View
-          className="h-12 w-12 rounded-full items-center justify-center mr-4 bg-gray-50 border border-gray-100"
+          className="h-12 w-12 rounded-full items-center justify-center mr-4 bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800"
           style={
             task.color
               ? { backgroundColor: task.color + "20" }
@@ -102,7 +103,7 @@ const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
                 ? "text-gray-500"
                 : task.isDone
                   ? "text-gray-400 line-through"
-                  : "text-gray-800"
+                  : "text-gray-800 dark:text-gray-100"
             }`}
             numberOfLines={1}
           >
@@ -118,7 +119,7 @@ const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
         </View>
 
         {hidden ? (
-          <View className="bg-gray-200 p-1.5 rounded-full">
+          <View className="bg-gray-200 dark:bg-gray-700 p-1.5 rounded-full">
             <Icon as={EyeOffIcon} className="text-gray-500" size="sm" />
           </View>
         ) : task.isDone ? (
@@ -126,7 +127,7 @@ const ItemView = React.memo(({ task, onItemPress }: ItemViewProps) => {
             <Icon as={CheckIcon} className="text-green-600" size="sm" />
           </View>
         ) : (
-          <View className="w-6 h-6 rounded-full border-2 border-gray-200" />
+          <View className="w-6 h-6 rounded-full border-2 border-gray-200 dark:border-gray-700" />
         )}
       </TouchableOpacity>
     </View>
@@ -273,6 +274,7 @@ function DatePopup({
   onClose: () => void;
   onSelect: (date: Date) => void;
 }) {
+  const dark = useIsDark();
   const selectedKey = toLocalDateString(value);
   const [selectedYear, selectedMonth] = selectedKey.split("-").map(Number);
   const [cursor, setCursor] = useState(
@@ -308,7 +310,7 @@ function DatePopup({
       >
         <Pressable
           onPress={() => {}}
-          className="w-full bg-white rounded-3xl p-5 border border-gray-100"
+          className="w-full bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-100 dark:border-gray-800"
           style={
             Platform.OS === "web"
               ? ({
@@ -330,20 +332,20 @@ function DatePopup({
               accessibilityRole="button"
               accessibilityLabel={i18n.t("previous_month")}
               onPress={() => setCursor(new Date(year, month - 1, 1))}
-              className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+              className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800"
             >
-              <Icon as={ChevronLeftIcon} size="sm" className="text-gray-600" />
+              <Icon as={ChevronLeftIcon} size="sm" className="text-gray-600 dark:text-gray-300" />
             </Pressable>
-            <Text className="text-base font-semibold text-gray-900">
+            <Text className="text-base font-semibold text-gray-900 dark:text-gray-50">
               {cursor.toLocaleDateString(locale, { month: "long", year: "numeric" })}
             </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={i18n.t("next_month")}
               onPress={() => setCursor(new Date(year, month + 1, 1))}
-              className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-100"
+              className="h-8 w-8 items-center justify-center rounded-full bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800"
             >
-              <Icon as={ChevronRightIcon} size="sm" className="text-gray-600" />
+              <Icon as={ChevronRightIcon} size="sm" className="text-gray-600 dark:text-gray-300" />
             </Pressable>
           </View>
           <View className="flex-row mb-2">
@@ -384,7 +386,7 @@ function DatePopup({
                   >
                     <Text
                       className="text-sm font-semibold"
-                      style={{ color: selected ? "#ffffff" : today ? "#8882e7" : "#374151" }}
+                      style={{ color: selected ? "#ffffff" : today ? "#8882e7" : dark ? "#e5e7eb" : "#374151" }}
                     >
                       {day}
                     </Text>
@@ -465,7 +467,7 @@ const FilterTask: React.FC<FilterTaskProps> = React.memo(
               className={`mr-3 px-5 py-2.5 rounded-full border ${
                 item === activePillLabel
                   ? "bg-[#8882e7] border-[#8882e7]"
-                  : "bg-white border-gray-200"
+                  : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700"
               }`}
               style={
                 item !== activePillLabel
@@ -481,7 +483,7 @@ const FilterTask: React.FC<FilterTaskProps> = React.memo(
             >
               <Text
                 className={`font-semibold text-sm ${
-                  item === activePillLabel ? "text-white" : "text-gray-600"
+                  item === activePillLabel ? "text-white" : "text-gray-600 dark:text-gray-300"
                 }`}
               >
                 {item}
@@ -499,6 +501,7 @@ FilterTask.displayName = "FilterTask";
 // ── TaskScreen ─────────────────────────────────────────────────────────────
 
 export default function TaskScreen() {
+  const dark = useIsDark();
   const [tasks, setTasks] = useState<Task[]>([]);
   const openSwipeableRef = useRef<Swipeable | null>(null);
   const swipeableRefs = useRef<Map<string, Swipeable | null>>(new Map());
@@ -660,7 +663,7 @@ export default function TaskScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View className="flex-1 bg-gray-50/50 pt-4">
+      <View className="flex-1 bg-gray-50/50 dark:bg-gray-950 pt-4">
         <SectionList
           ref={sectionListRef}
           sections={sections}
@@ -673,9 +676,9 @@ export default function TaskScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ expanded: showAll }}
                   onPress={() => setShowAll((open) => !open)}
-                  className="mx-4 mt-2 mb-3 flex-row items-center rounded-2xl border bg-white px-4 py-3"
+                  className="mx-4 mt-2 mb-3 flex-row items-center rounded-2xl border bg-white dark:bg-gray-900 px-4 py-3"
                   style={{
-                    borderColor: showAll ? "#8882e7" : "#f3f4f6",
+                    borderColor: showAll ? "#8882e7" : dark ? "#1f2937" : "#f3f4f6",
                     shadowColor: "#000",
                     shadowOffset: { width: 0, height: 2 },
                     shadowOpacity: 0.05,
@@ -683,10 +686,10 @@ export default function TaskScreen() {
                     elevation: 2,
                   }}
                 >
-                  <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-gray-100">
+                  <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                     <Icon as={EyeOffIcon} size="sm" className="text-gray-500" />
                   </View>
-                  <Text className="flex-1 text-sm font-semibold text-gray-800">
+                  <Text className="flex-1 text-sm font-semibold text-gray-800 dark:text-gray-100">
                     {i18n.t("show_all")}
                   </Text>
                   <Text className="mr-2 text-sm font-semibold text-gray-400">
@@ -708,7 +711,7 @@ export default function TaskScreen() {
                 <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                   {i18n.t("completed")} ({section.data.length})
                 </Text>
-                <View className="h-[1px] flex-1 bg-gray-200 ml-4" />
+                <View className="h-[1px] flex-1 bg-gray-200 dark:bg-gray-700 ml-4" />
               </View>
             );
           }}
