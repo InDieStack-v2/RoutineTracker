@@ -38,7 +38,7 @@ export default function TabLayout() {
           borderWidth: 1,
           borderTopWidth: 1,
           borderColor: dark ? "#1f2937" : "#e5e7eb",
-          backgroundColor: dark ? "rgba(31, 41, 55, 0.5)" : "rgba(255, 255, 255, 0.5)",
+          backgroundColor: dark ? "rgba(31, 41, 55, 0.75)" : "rgba(255, 255, 255, 0.75)",
           elevation: 0,
         },
         tabBarShowLabel: false,
