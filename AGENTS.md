@@ -53,6 +53,10 @@ This document provides essential information for AI agents working on the `routi
     *   Example: `import { Box } from "@/components/ui/box";`
     *   Check `gluestack-ui.config.json` and `global.css` for theme configurations.
 *   **Shadows:** Avoid using `shadow-*` utility classes (e.g., `shadow-md`, `shadow-lg`) from NativeWind as they can cause issues with Expo Router/Navigation on some platforms. Instead, use React Native's `StyleSheet` or the `style` prop with native shadow properties (`shadowColor`, `shadowOffset`, `shadowOpacity`, `elevation`, etc.).
+*   **Light/Dark Theme (required):** The app supports Light, Dark and System themes (Settings → Theme, stored in `useSettingsStore().theme`). Every new or changed UI must look correct in **both** light and dark.
+    *   Pair each hardcoded color class with a `dark:` variant, following the existing mapping: `bg-white` → `dark:bg-gray-900`, `bg-gray-50` → `dark:bg-gray-950`, `bg-gray-100` → `dark:bg-gray-800`, `border-gray-100` → `dark:border-gray-800`, `text-gray-900` → `dark:text-gray-50`, `text-gray-600` → `dark:text-gray-300`. Gluestack semantic tokens (e.g. `bg-background-0`, `text-typography-900`) already flip and need no variant.
+    *   For inline hex colors (`style`, SVG `fill`/`stroke`, `color` props), use `useIsDark()` from `@/hooks/useIsDark` and branch: `dark ? "#1f2937" : "#f3f4f6"`. Do **not** read NativeWind's `useColorScheme()` for this; it is unreliable on web.
+    *   Check new UI in both themes (and on web) before finishing.
 *   **Design Philosophy:** Follow a **minimalist design system** for all future modifications. Avoid clutter, excessive colors, or complex UI elements unless necessary. Prioritize clean, whitespace-heavy, and simple interfaces.
 
 ### State Management (Zustand)
