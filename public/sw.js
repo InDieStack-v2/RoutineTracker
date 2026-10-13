@@ -1,5 +1,5 @@
 // Bump VERSION to drop every cached resource on next activation.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `routine-tracker-${VERSION}`;
 
 // Expo exports these with content-hashed filenames, so they never change.
@@ -19,8 +19,11 @@ self.addEventListener('activate', (event) => {
 });
 
 // Only full 200 responses are safe to store (skips 206 ranges, errors, opaque).
+// Non-navigations must not be HTML: Pages answers a missing asset with the SPA index.html (200),
+// and caching that under a wasm/js URL would break the app permanently (cache-first).
 const put = (request, response) => {
-  if (response.status === 200) {
+  const isHtml = (response.headers.get('content-type') || '').includes('text/html');
+  if (response.status === 200 && (request.mode === 'navigate' || !isHtml)) {
     const copy = response.clone();
     caches.open(CACHE).then((c) => c.put(request, copy));
   }
