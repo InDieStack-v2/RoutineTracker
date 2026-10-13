@@ -14,6 +14,8 @@ config.transformer.minifierConfig = {
 config.resolver.assetExts.push('wasm');
 config.resolver.sourceExts = config.resolver.sourceExts.filter((ext) => ext !== 'wasm');
 
+config.transformer.assetPlugins = [require.resolve('./scripts/asset-plugin.js')];
+
 const nativeWindConfig = withNativeWind(config, { input: './global.css' });
 
 // SharedArrayBuffer, required by wa-sqlite, is only available on an isolated page.
