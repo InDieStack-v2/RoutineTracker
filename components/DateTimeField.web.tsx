@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { toLocalDateString } from "@/utils/dateUtils";
+import { useIsDark } from "@/hooks/useIsDark";
 
 type DateTimeFieldProps = {
   mode: "date" | "time";
@@ -8,6 +9,7 @@ type DateTimeFieldProps = {
 };
 
 export function DateTimeField({ mode, value, onChange }: DateTimeFieldProps) {
+  const dark = useIsDark();
   const inputValue =
     mode === "date"
       ? toLocalDateString(value)
@@ -37,12 +39,13 @@ export function DateTimeField({ mode, value, onChange }: DateTimeFieldProps) {
       onChange(next);
     },
     style: {
-      border: "1px solid #e5e7eb",
+      border: `1px solid ${dark ? "#374151" : "#e5e7eb"}`,
       borderRadius: 8,
       padding: "6px 10px",
       fontSize: 14,
-      color: "#111827",
-      backgroundColor: "#f3f4f6",
+      color: dark ? "#f9fafb" : "#111827",
+      backgroundColor: dark ? "#1f2937" : "#f3f4f6",
+      colorScheme: dark ? "dark" : "light",
     },
   });
 }
