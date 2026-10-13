@@ -8,6 +8,8 @@ import {
   scheduledCompletionRate,
   type RoutineTaskSummary,
 } from "@/services/routineTaskService";
+import { averageCompletion, mostMissed } from "@/services/dashboardStats";
+import { useStreakStore } from "@/store/streakStore";
 import { useCandyContext } from "@/store/context";
 import type { RoutineTask } from "@/store/candyStore";
 import { useMoodStore } from "@/store/moodStore";
@@ -1160,6 +1162,123 @@ function MoodChart() {
   );
 }
 
+const DASHBOARD_DAYS = 31;
+
+function AvgBar({ label, value }: { label: string; value: number | null }) {
+  const dark = useIsDark();
+  return (
+    <View className="flex-1">
+      <View className="flex-row items-baseline justify-between mb-2">
+        <Text className="text-xs font-semibold text-gray-400">{label}</Text>
+        <Text className="text-base font-bold text-gray-900 dark:text-gray-50">
+          {value == null ? "–" : `${value}%`}
+        </Text>
+      </View>
+      <View
+        style={{
+          height: 6,
+          borderRadius: 3,
+          overflow: "hidden",
+          backgroundColor: dark ? "#1f2937" : TRACK,
+        }}
+      >
+        <View style={{ width: `${value ?? 0}%`, height: 6, backgroundColor: ACCENT }} />
+      </View>
+    </View>
+  );
+}
+
+function Dashboard() {
+  const dark = useIsDark();
+  const timezone = useSettingsStore((state) => state.timezone);
+  const routineTasks = useCandyContext((state) => state.routineTasks);
+  const streak = useStreakStore((state) => state.streakCount);
+  const [finished, setFinished] = useState<string[][] | null>(null);
+
+  const days = Array.from({ length: DASHBOARD_DAYS }, (_, index) =>
+    addLocalDays(new Date(), -index, timezone),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const dates = Array.from({ length: DASHBOARD_DAYS }, (_, index) =>
+        addLocalDays(new Date(), -index, timezone),
+      );
+      RoutineTaskService.getFinishedRoutineTasksForDates(dates)
+        .then((rows) => active && setFinished(rows))
+        .catch((error) => log.error("[HomeScreen] Failed to load dashboard", { error }));
+      return () => {
+        active = false;
+      };
+    }, [timezone]),
+  );
+
+  const top = finished ? mostMissed(routineTasks, days, finished, 30) : [];
+
+  return (
+    <Board title={i18n.t("dashboard")}>
+      <View className="flex-row items-center mb-5">
+        <View
+          className="items-center justify-center"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            marginRight: 14,
+            backgroundColor: dark ? "#2a2850" : "#eeedfc",
+          }}
+        >
+          <Text style={{ fontSize: 26, lineHeight: 32 }}>🔥</Text>
+        </View>
+        <View>
+          <Text className="text-xs font-semibold text-gray-400">{i18n.t("streak")}</Text>
+          <Text style={{ fontSize: 32, lineHeight: 38, fontWeight: "700", color: ACCENT }}>
+            {i18n.t("streak_days", { count: streak })}
+          </Text>
+        </View>
+      </View>
+      <View className="flex-row mb-5" style={{ gap: 20 }}>
+        <AvgBar label={i18n.t("avg_7")} value={finished ? averageCompletion(routineTasks, days, finished, 7) : null} />
+        <AvgBar label={i18n.t("avg_30")} value={finished ? averageCompletion(routineTasks, days, finished, 30) : null} />
+      </View>
+      <View className="border-t border-gray-100 dark:border-gray-800 pt-4">
+        <Text className="text-xs font-semibold text-gray-400 mb-2">{i18n.t("most_missed")}</Text>
+        {finished && top.length === 0 ? (
+          <Text className="text-sm text-gray-400">{i18n.t("nothing_missed")}</Text>
+        ) : null}
+        {top.map(({ task, count }) => (
+          <View key={task.id} className="flex-row items-center" style={{ minHeight: 40 }}>
+            <View
+              className="items-center justify-center"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                marginRight: 10,
+                backgroundColor: task.color ? `${task.color}20` : dark ? "#1f2937" : "#f3f4f6",
+              }}
+            >
+              <Text style={{ fontSize: 15, lineHeight: 20, height: 20, textAlign: "center" }}>
+                {task.icon || "📝"}
+              </Text>
+            </View>
+            <Text
+              numberOfLines={1}
+              className="flex-1 text-sm font-semibold text-gray-800 dark:text-gray-100"
+            >
+              {task.label}
+            </Text>
+            <Text className="text-sm font-semibold text-gray-400 ml-2">
+              {i18n.t("missed_times", { count })}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </Board>
+  );
+}
+
 export default function HomeScreen() {
   const scrollViewRef = React.useRef<ScrollView>(null);
 
@@ -1187,6 +1306,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ width: "100%", maxWidth: 576 }}>
+          <Dashboard />
           <WeeklyChart />
           <MonthlyCalendar />
           <MoodChart />

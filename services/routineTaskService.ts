@@ -118,20 +118,20 @@ function isLiveOnDate(task: RoutineTask, onDate: Date | null): boolean {
   return true;
 }
 
+export function scheduledTaskIds(tasks: RoutineTask[], onDate: Date): string[] {
+  return tasks
+    .filter((task) => isLiveOnDate(task, onDate) && isTaskScheduledOn(task, onDate))
+    .map((task) => task.id);
+}
+
 export function scheduledCompletionRate(
   tasks: RoutineTask[],
   onDate: Date,
   finishedIds: readonly string[],
 ): number {
   const finished = new Set(finishedIds);
-  let available = 0;
-  let done = 0;
-  for (const task of tasks) {
-    if (!isLiveOnDate(task, onDate) || !isTaskScheduledOn(task, onDate)) continue;
-    available += 1;
-    if (finished.has(task.id)) done += 1;
-  }
-  return available === 0 ? 0 : done / available;
+  const ids = scheduledTaskIds(tasks, onDate);
+  return ids.length === 0 ? 0 : ids.filter((id) => finished.has(id)).length / ids.length;
 }
 
 export class RoutineTaskService {

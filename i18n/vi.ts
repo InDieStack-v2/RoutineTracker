@@ -29,6 +29,14 @@ export default {
   moods_logged: "%{count} ngày đã ghi",
 
   // Home (Stats)
+  dashboard: "Tổng quan",
+  streak: "Streak hiện tại",
+  streak_days: "%{count} ngày",
+  avg_7: "TB 7 ngày",
+  avg_30: "TB 30 ngày",
+  most_missed: "Hay bỏ nhất (30 ngày)",
+  missed_times: "%{count} lần",
+  nothing_missed: "Chưa bỏ việc nào",
   calendar_stats: "Thống kê lịch",
   tasks_completed: "Công việc đã hoàn thành",
   mood_chart: "Biểu đồ tâm trạng",

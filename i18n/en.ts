@@ -29,6 +29,14 @@ export default {
   moods_logged: "%{count} logged",
   
   // Home (Stats)
+  dashboard: "Dashboard",
+  streak: "Current streak",
+  streak_days: "%{count} days",
+  avg_7: "7-day avg",
+  avg_30: "30-day avg",
+  most_missed: "Most missed (30 days)",
+  missed_times: "%{count}×",
+  nothing_missed: "Nothing missed",
   calendar_stats: "Calendar Stats",
   tasks_completed: "Tasks Completed",
   mood_chart: "Mood Chart",

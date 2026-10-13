@@ -13,21 +13,26 @@ This document provides essential information for AI agents working on the `routi
 ## 2. Build, Lint, and Test Commands
 
 ### Build & Run
-*   **Start Development Server:** `yarn start` (or `npm start`)
-*   **Run on Android:** `yarn android`
-*   **Run on iOS:** `yarn ios`
-*   **Run on Web:** `yarn web`
+*   **Package manager:** This project uses **pnpm** (see `pnpm-lock.yaml`). Use `pnpm` for installs and scripts (`pnpm install`, `pnpm <script>`, `pnpm exec <bin>`); do not use `yarn` or `npm`, and do not create `yarn.lock` / `package-lock.json`.
+*   **Start Development Server:** `pnpm start`
+*   **Run on Android:** `pnpm android`
+*   **Run on iOS:** `pnpm ios`
+*   **Run on Web:** `pnpm web`
 
 ### Linting & Formatting
-*   **Lint Code:** `yarn lint` (Runs `expo lint` with ESLint)
-*   **Format Code:** Uses Prettier. Ensure your editor or pre-commit hooks handle formatting, or run `npx prettier --write .` if unsure.
+*   **Lint Code:** `pnpm lint` (Runs `expo lint` with ESLint)
+*   **Format Code:** Uses Prettier. Ensure your editor or pre-commit hooks handle formatting, or run `pnpm exec prettier --write .` if unsure.
 
 ### Testing
-*   **Status:** There are currently **NO** automated tests configured in this project.
-*   **Action for Agents:**
-    *   Since no test harness exists, verify your changes by carefully analyzing the logic and, if possible, simulating the flow mentally.
-    *   Do not attempt to run `npm test` or `yarn test` as they will fail or do nothing.
-    *   If you are implementing a complex logic, consider proposing the addition of a testing framework (like Jest + React Native Testing Library) to the user.
+*   **Framework:** Jest (`jest-expo` preset, config in `jest.config.js`). Tests live in `__tests__/` folders next to the code (e.g. `services/__tests__/`, `utils/__tests__/`).
+*   **Run:** `pnpm test` (pinned to `TZ=America/New_York` so date/DST logic is deterministic). Single file: `pnpm exec cross-env TZ=America/New_York jest services/__tests__/dashboardStats.test.ts`.
+*   **Known issue:** `utils/dateUtils.test.js` is a standalone Node script (run it with `pnpm test:date`); it calls `process.exit` and fails under Jest. Ignore it in `pnpm test` output.
+*   **Tests are required for logic changes:** any new or changed business logic (scheduling, completion rates, streaks, date/timezone handling) must ship with unit tests.
+    *   Keep logic in pure functions under `services/` or `utils/` (take data in, return data out) so it can be tested without rendering UI. Example: `services/dashboardStats.ts` holds the Home dashboard maths, and `app/(tabs)/index.tsx` only renders it.
+    *   Services that import the DB or settings store need these mocks at the top of the test: `jest.mock('@/services/db', ...)`, `jest.mock('@/store/settingsStore', ...)`, `jest.mock('../logger')`. See `services/__tests__/dashboardStats.test.ts`.
+    *   Use `@jest-environment node` for non-UI tests.
+    *   Cover edge cases: empty input, window boundaries (off-by-one), days with nothing scheduled, task `createdAt`/`endDate`/`deletedAt`.
+*   **Do not duplicate existing logic:** before computing something new (e.g. streak), check for an existing service/store. The streak shown in the Header and Dashboard comes from `store/streakStore.ts` (`services/streakService.ts`), which includes freezes.
 
 ## 3. Code Style Guidelines
 
@@ -88,9 +93,9 @@ This document provides essential information for AI agents working on the `routi
 ## 5. Development Workflow for Agents
 
 1.  **Analyze:** Before making changes, scan the relevant files to understand existing patterns. Use `grep` or `glob` to find usage examples.
-2.  **Plan:** Formulate a plan. Since there are no tests, be extra thorough in your logic verification.
+2.  **Plan:** Formulate a plan. For logic changes, decide which unit tests will cover it.
 3.  **Implement:** Write code that matches the existing style (NativeWind + Gluestack, Zustand, TypeScript).
-4.  **Verify:** Run `yarn lint` to catch static analysis errors. Ensure types check out.
+4.  **Verify:** Run `pnpm test` and `pnpm lint`. Ensure types check out (`pnpm exec tsc --noEmit`; existing errors in `components/ui/` are known).
 
 ## 6. Specific Rules (Cursor/Copilot)
 
