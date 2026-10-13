@@ -13,6 +13,7 @@ jobs:
   deploy-web:
     if: ${{ !endsWith(github.ref_name, '-android') && !endsWith(github.ref_name, '-ios') }}
     runs-on: ubuntu-latest
+    environment: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +40,7 @@ jobs:
   build-android:
     if: ${{ !endsWith(github.ref_name, '-web') && !endsWith(github.ref_name, '-ios') }}
     runs-on: ubuntu-latest
+    environment: dev
     permissions:
       contents: write
     steps:
@@ -89,6 +91,7 @@ jobs:
   build-ios:
     if: ${{ !endsWith(github.ref_name, '-web') && !endsWith(github.ref_name, '-android') }}
     runs-on: macos-latest
+    environment: dev
     permissions:
       contents: write
     steps:
