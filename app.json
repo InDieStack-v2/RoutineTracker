@@ -8,6 +8,7 @@
     "scheme": "routinetracker",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.kakavip.routinetracker",
       "supportsTablet": true
     },
     "android": {
