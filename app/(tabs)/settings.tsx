@@ -9,6 +9,7 @@ import { Box } from "@/components/ui/box";
 import { Pressable } from "@/components/ui/pressable";
 import { CheckIcon, ChevronRightIcon } from "lucide-react-native";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import i18n from "@/i18n";
 import { deviceTimeZone, isSystemTimeZone, listTimeZones, timeZoneOffsetLabel } from "@/utils/timezone";
 import { Stack } from "expo-router";
@@ -171,6 +172,7 @@ function TimezonePicker({
 
 
 export default function SettingScreen() {
+  const tabBarSpace = useTabBarSpace();
   const { language, setLanguage, theme, setTheme, timezone, setTimezone, reminderTime, setReminderTime } =
     useSettingsStore();
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -208,7 +210,7 @@ export default function SettingScreen() {
 
 
   return (
-    <Box className="flex-1 bg-gray-50 dark:bg-gray-950">
+    <Box className="flex-1 bg-gray-50 dark:bg-gray-950" style={{ paddingBottom: tabBarSpace }}>
       <Stack.Screen
         options={{
           title: i18n.t("settings"),

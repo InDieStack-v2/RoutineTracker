@@ -11,6 +11,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react-native";
 import { Icon } from "@/components/ui/icon";
 import { Emojis } from "@/constants/Moods";
+import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import i18n from "@/i18n";
 import { useMoodStore } from "@/store/moodStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -164,6 +165,7 @@ function MoodPicker({
 
 
 export default function MoodScreen() {
+  const tabBarSpace = useTabBarSpace();
   const dark = useIsDark();
   const language = useSettingsStore((state) => state.language);
   const timezone = useSettingsStore((state) => state.timezone);
@@ -225,7 +227,7 @@ export default function MoodScreen() {
           alignSelf: "center",
           paddingHorizontal: 16,
           paddingTop: 16,
-          paddingBottom: 96,
+          paddingBottom: tabBarSpace,
         }}
         showsVerticalScrollIndicator={false}
       >

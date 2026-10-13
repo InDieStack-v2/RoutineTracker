@@ -34,7 +34,7 @@ import {
 
 import { Icon } from "@/components/ui/icon";
 import { Fab } from "@/components/ui/fab";
-import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
+import { TAB_BAR_HEIGHT, useTabBarBottom } from "@/hooks/useTabBarSpace";
 import i18n from "@/i18n";
 import { calendarDateString, noonOnCalendarDate, shiftCalendarDate, toLocalDateString, todayLocalDateString } from "@/utils/dateUtils";
 import { useIsDark } from "@/hooks/useIsDark";
@@ -501,8 +501,7 @@ export default function TaskScreen() {
   const [filteredOnDate, setFilteredOnDate] = useState<Date | null>(new Date());
   const [showAll, setShowAll] = useState(false);
   const router = useRouter();
-  const tabOverflow = useBottomTabOverflow();
-  const fabBottom = tabOverflow + FAB_GAP;
+  const fabBottom = useTabBarBottom() + TAB_BAR_HEIGHT + FAB_GAP;
 
   const routineTasks = useCandyContext((state) => state.routineTasks);
   const timezone = useSettingsStore((state) => state.timezone);

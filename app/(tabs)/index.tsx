@@ -1,6 +1,7 @@
 import { ProgressCircle } from "@/components/CircleProgress";
 import { Icon } from "@/components/ui/icon";
 import { Emojis } from "@/constants/Moods";
+import { useTabBarSpace } from "@/hooks/useTabBarSpace";
 import i18n from "@/i18n";
 import log from "@/services/logger";
 import {
@@ -1280,6 +1281,7 @@ function Dashboard() {
 }
 
 export default function HomeScreen() {
+  const tabBarSpace = useTabBarSpace();
   const scrollViewRef = React.useRef<ScrollView>(null);
 
   useScrollToTop(scrollViewRef);
@@ -1299,7 +1301,7 @@ export default function HomeScreen() {
             width: "100%",
             alignItems: "center",
             paddingTop: 16,
-            paddingBottom: Platform.OS === "ios" ? 96 : 16,
+            paddingBottom: tabBarSpace,
             ...(Platform.OS === "web" ? { overflowAnchor: "none" } : null),
           } as ViewStyle
         }
