@@ -1,7 +1,7 @@
 {
   "id": "/",
   "name": "Routine Tracker",
-  "short_name": "Routine",
+  "short_name": "RoTi",
   "description": "Track daily routines, streaks, and moods.",
   "start_url": "/",
   "scope": "/",
